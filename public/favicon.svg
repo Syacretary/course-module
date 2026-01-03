@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <style>
+    path { fill: black; }
+    rect { fill: transparent; }
+    @media (prefers-color-scheme: dark) {
+      path { fill: white; }
+    }
+  </style>
+  <!-- Background shape (optional, keeping it minimal/transparent for modern look, or text only) -->
+  <rect width="512" height="512" rx="15%" />
+  
+  <!-- C -->
+  <path d="M160 128c-50 0-90 40-90 90v76c0 50 40 90 90 90h30v-40h-30c-28 0-50-22-50-50v-76c0-28 22-50 50-50h30v-40h-30z"/>
+  
+  <!-- M -->
+  <path d="M260 128v256h40v-160l60 160h20l60-160v160h40v-256h-50l-60 160l-60-160h-50z"/>
+</svg>

@@ -1,0 +1,1 @@
+export { useCourseGenerator } from "@/contexts/CourseGenerationContext";
