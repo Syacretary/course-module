@@ -35,23 +35,6 @@ export default function MakeCourse() {
   const [isEmailSending, setIsEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
-  // Check for API key
-  const hasApiKey = !!import.meta.env.VITE_GROQ_API_KEY;
-
-  if (!hasApiKey) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Alert variant="destructive" className="max-w-lg">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            <strong>VITE_GROQ_API_KEY</strong> belum dikonfigurasi. 
-            Silakan tambahkan API key Groq di environment variable untuk menggunakan fitur ini.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
   const handleNextStep = () => {
     if (!user) {
       setShowLoginDialog(true);

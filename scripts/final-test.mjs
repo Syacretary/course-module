@@ -57,7 +57,7 @@ async function testGroq() {
   try {
     const client = new OpenAI({
       baseURL: "https://api.groq.com/openai/v1",
-      apiKey: process.env.VITE_GROQ_API_KEY,
+      apiKey: process.env.GROQ_API_KEY,
     });
     const start = Date.now();
     await client.chat.completions.create({
