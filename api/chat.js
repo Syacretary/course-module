@@ -5,7 +5,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // Initialize Clients
 const groq = new OpenAI({
   baseURL: "https://api.groq.com/openai/v1",
-  apiKey: process.env.VITE_GROQ_API_KEY,
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 const openrouter = new OpenAI({
