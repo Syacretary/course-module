@@ -34,15 +34,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Persistence for Dev Mode (as it's a client-side preference for now)
   const [isDev, setIsDev] = useState(() => localStorage.getItem("dev_mode") === "true");
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
 
   useEffect(() => {
     // Handle Firebase Auth State
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
+        const isAdmin = firebaseUser.email === adminEmail;
+        // Only allow dev role if user is admin AND dev mode is active
+        const role = (isAdmin && isDev) ? "dev" : "user";
+        
         setUser({
           id: firebaseUser.uid,
           email: firebaseUser.email || "",
-          role: isDev ? "dev" : "user"
+          role: role
         });
       } else {
         setUser(null);
@@ -56,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     return () => unsubscribe();
-  }, [isDev]);
+  }, [isDev, adminEmail]);
 
   const handleEmailLinkSignIn = async () => {
     let email = window.localStorage.getItem('emailForSignIn');
@@ -105,6 +110,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleDevMode = () => {
+    if (user?.email !== adminEmail) {
+      toast.error("Akses Ditolak: Anda bukan Admin.");
+      return;
+    }
+
     const newDevState = !isDev;
     setIsDev(newDevState);
     localStorage.setItem("dev_mode", String(newDevState));

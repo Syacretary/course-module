@@ -9,8 +9,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AlertCircle, BookOpen, Mail, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
+import { AlertCircle, Mail, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { Header } from "@/components/Header";
+import { CursorGlow } from "@/components/CursorGlow";
 
 export default function MakeCourse() {
   const { user, login } = useAuth();
@@ -64,55 +66,25 @@ export default function MakeCourse() {
 
     setIsEmailSending(true);
     
-    // Simulate API Call for Magic Link
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsEmailSending(false);
-    setEmailSent(true);
-    toast.success("Magic Link terkirim ke email Anda!");
-
-    // Simulate User clicking the link after 2 seconds
-    setTimeout(() => {
-      login(email); // Use email as username/id
-      setShowLoginDialog(false);
-      proceedToPersonalization();
-      toast.success("Berhasil login otomatis!");
-    }, 2000);
+    try {
+      await login(email);
+      setEmailSent(true);
+    } catch (error) {
+      // Error handled in login
+    } finally {
+      setIsEmailSending(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      {state.step !== "complete" && (
-        <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-16 items-center justify-between">
-            <a href="/" className="flex items-center gap-2">
-              <BookOpen className="w-8 h-8 text-primary" />
-              <span className="font-display font-bold text-xl hidden sm:inline-block">Course Module</span>
-            </a>
-            
-            {/* Progress Indicator */}
-            <div className="flex items-center gap-2">
-              {["topics", "personalization", "generating"].map((step, i) => (
-                <div
-                  key={step}
-                  className={`w-2 h-2 rounded-full transition-colors ${
-                    state.step === step
-                      ? "bg-primary w-6"
-                      : i < ["topics", "personalization", "generating"].indexOf(state.step)
-                      ? "bg-primary"
-                      : "bg-muted"
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
-        </header>
-      )}
+    <div className="min-h-screen bg-background relative overflow-x-hidden">
+      <CursorGlow />
+      
+      {state.step !== "complete" && <Header />}
 
       {/* Error Display */}
       {error && (
-        <div className="container py-4">
+        <div className="container py-4 pt-24 relative z-10">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
@@ -121,7 +93,7 @@ export default function MakeCourse() {
       )}
 
       {/* Content */}
-      <main className={state.step === "complete" ? "" : "container py-8"}>
+      <main className={state.step === "complete" ? "" : "container py-8 pt-24 relative z-10"}>
         {state.step === "topics" && (
           <TopicSelector
             selectedTopics={state.selectedTopics}

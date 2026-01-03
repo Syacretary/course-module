@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import { Course } from "@/types/course";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { Header } from "@/components/Header";
+import { CursorGlow } from "@/components/CursorGlow";
 
 export default function CoursePlayer() {
   const { id } = useParams();
@@ -52,7 +54,7 @@ export default function CoursePlayer() {
 
   if (loading) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center gap-4">
+      <div className="h-screen flex flex-col items-center justify-center gap-4 bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
         <p className="text-muted-foreground">Membuka module...</p>
       </div>
@@ -61,7 +63,7 @@ export default function CoursePlayer() {
 
   if (!course) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center space-y-4">
+      <div className="h-screen flex flex-col items-center justify-center space-y-4 bg-background">
         <h1 className="text-2xl font-bold">Course tidak ditemukan</h1>
         <Button onClick={() => navigate("/my-courses")}>
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -72,18 +74,23 @@ export default function CoursePlayer() {
   }
 
   return (
-    <div className="h-screen flex flex-col animate-in fade-in duration-500">
-      <div className="bg-card border-b p-4 flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/my-courses")}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h1 className="font-semibold">{course.title}</h1>
-      </div>
-      <div className="flex-1 overflow-hidden">
-        <CourseViewer 
-          course={course} 
-          onNewCourse={() => navigate("/make-course")} 
-        />
+    <div className="min-h-screen bg-background relative overflow-x-hidden">
+      <CursorGlow />
+      <Header />
+
+      <div className="h-screen flex flex-col pt-20 relative z-10">
+        <div className="bg-card/50 backdrop-blur-sm border-b p-4 flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/my-courses")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="font-semibold line-clamp-1">{course.title}</h1>
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <CourseViewer 
+            course={course} 
+            onNewCourse={() => navigate("/make-course")} 
+          />
+        </div>
       </div>
     </div>
   );

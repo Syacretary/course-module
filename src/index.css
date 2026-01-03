@@ -2,150 +2,83 @@
 @tailwind components;
 @tailwind utilities;
 
-/* CourseForge Design System - Educational Platform Theme */
-
 @layer base {
   :root {
     --background: 220 20% 97%;
     --foreground: 220 25% 10%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 220 25% 10%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 25% 10%;
-
     --primary: 252 85% 60%;
     --primary-foreground: 0 0% 100%;
-
-    --secondary: 220 20% 94%;
-    --secondary-foreground: 220 25% 20%;
-
-    --muted: 220 15% 92%;
-    --muted-foreground: 220 10% 45%;
-
-    --accent: 168 76% 42%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 10%;
     --border: 220 15% 88%;
     --input: 220 15% 88%;
-    --ring: 252 85% 60%;
-
     --radius: 0.75rem;
-
-    /* Custom tokens for course platform */
-    --success: 152 69% 40%;
-    --success-foreground: 0 0% 100%;
-    
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
-
-    --gradient-primary: linear-gradient(135deg, hsl(252 85% 60%), hsl(280 85% 55%));
-    --gradient-accent: linear-gradient(135deg, hsl(168 76% 42%), hsl(180 70% 45%));
-    --gradient-warm: linear-gradient(135deg, hsl(38 92% 50%), hsl(25 95% 55%));
-
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 220 25% 20%;
-    --sidebar-primary: 252 85% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 20% 96%;
-    --sidebar-accent-foreground: 220 25% 20%;
-    --sidebar-border: 220 15% 90%;
-    --sidebar-ring: 252 85% 60%;
   }
-
+  
   .dark {
-    --background: 222 30% 8%;
-    --foreground: 220 20% 95%;
-
-    --card: 222 25% 12%;
-    --card-foreground: 220 20% 95%;
-
-    --popover: 222 25% 12%;
-    --popover-foreground: 220 20% 95%;
-
-    --primary: 252 85% 65%;
-    --primary-foreground: 222 30% 8%;
-
-    --secondary: 222 20% 18%;
-    --secondary-foreground: 220 20% 90%;
-
-    --muted: 222 20% 16%;
-    --muted-foreground: 220 15% 55%;
-
-    --accent: 168 70% 50%;
-    --accent-foreground: 222 30% 8%;
-
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 222 20% 20%;
-    --input: 222 20% 20%;
-    --ring: 252 85% 65%;
-
-    --success: 152 60% 50%;
-    --success-foreground: 222 30% 8%;
-    
-    --warning: 38 85% 55%;
-    --warning-foreground: 222 30% 8%;
-
-    --sidebar-background: 222 25% 10%;
-    --sidebar-foreground: 220 20% 90%;
-    --sidebar-primary: 252 85% 65%;
-    --sidebar-primary-foreground: 222 30% 8%;
-    --sidebar-accent: 222 20% 15%;
-    --sidebar-accent-foreground: 220 20% 90%;
-    --sidebar-border: 222 20% 18%;
-    --sidebar-ring: 252 85% 65%;
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 6%;
+    --border: 240 5% 15%;
+    --primary: 252 100% 68%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1;
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-bold tracking-tight;
-  }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground antialiased selection:bg-primary/30 selection:text-primary; }
 }
 
 @layer utilities {
-  .gradient-primary {
-    background: var(--gradient-primary);
-  }
-  
-  .gradient-accent {
-    background: var(--gradient-accent);
-  }
-  
-  .gradient-warm {
-    background: var(--gradient-warm);
+  .text-glow {
+    text-shadow: 0 0 20px rgba(124, 58, 237, 0.5);
   }
 
-  .text-gradient-primary {
-    background-color: #7c3aed; /* Fallback */
-    background-image: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
-    -webkit-background-clip: text;
+  /* Teknik Gradasi Aman: Ada fallback warna ungu jika clipping gagal */
+  .text-gradient-safe {
+    background-image: linear-gradient(to right, #7c3aed, #db2777, #f43f5e);
     background-clip: text;
+    -webkit-background-clip: text;
+    color: #7c3aed; /* Fallback: warna ungu solid */
     -webkit-text-fill-color: transparent;
-    color: transparent;
-    display: inline-block; /* Inline-block is safer for box-model calculations */
+    display: inline-block;
+  }
+  
+  .glass-panel {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl;
   }
 
-  .glass {
-    @apply bg-card/80 backdrop-blur-lg border border-border/50;
+  .mesh-grid {
+    background-size: 50px 50px;
+    background-image: linear-gradient(to right, rgba(128, 128, 128, 0.05) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(128, 128, 128, 0.05) 1px, transparent 1px);
+  }
+  
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
   }
 
-  .card-hover {
-    @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  
+  .animate-marquee {
+    animation: marquee 30s linear infinite;
   }
 }

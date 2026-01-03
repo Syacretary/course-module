@@ -11,14 +11,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { NavLink } from "@/components/NavLink";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
@@ -27,9 +19,11 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { RECOMMENDED_TOPICS } from "@/data/topics";
 import { TopicIcon } from "@/components/TopicIcon";
+import { Header } from "@/components/Header";
+import { CursorGlow } from "@/components/CursorGlow";
 
 export default function MyCourses() {
-  const { user, logout, toggleDevMode } = useAuth();
+  const { user } = useAuth();
   const { courses, deleteCourse, restoreCourse, toggleFavorite, updateCourseTitle } = useSavedCourses();
   const navigate = useNavigate();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -55,7 +49,6 @@ export default function MyCourses() {
       const saved = localStorage.getItem("draft_course_state");
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Only show draft if it's past the initial topic selection but not finished
         if (parsed.step !== "topics" && parsed.step !== "complete") {
           setDraftState(parsed);
         }
@@ -66,53 +59,21 @@ export default function MyCourses() {
   });
 
   return (
-    <div className="min-h-screen bg-background p-6 md:p-12">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <header className="flex items-center justify-between">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-display font-bold">Course Saya</h1>
-            <p className="text-muted-foreground">
-              {user?.role === 'dev' 
-                ? `Developer Mode: Viewing all courses (${courses.length})`
-                : `Koleksi materi pembelajaran milik ${user?.username}`
-              }
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-4">
-             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <UserIcon className="w-4 h-4" />
-                  {user?.username}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={toggleDevMode}>
-                  <Shield className="w-4 h-4 mr-2" />
-                  {user?.role === 'dev' ? 'Exit Dev Mode' : 'Enter Dev Mode'}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive" onClick={() => {
-                  logout();
-                  navigate("/login");
-                }}>
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+    <div className="min-h-screen bg-background relative overflow-x-hidden">
+      <CursorGlow />
+      <Header />
 
-            <NavLink to="/make-course">
-              <Button>
-                <BookOpen className="w-4 h-4 mr-2" />
-                Buat Baru
-              </Button>
-            </NavLink>
-          </div>
-        </header>
+      <div className="max-w-6xl mx-auto space-y-8 pt-24 px-6 md:px-12 relative z-10">
+        
+        <div className="space-y-1">
+          <h1 className="text-3xl font-display font-bold">Kurikura Library</h1>
+          <p className="text-muted-foreground">
+            {user?.role === 'dev' 
+              ? `Developer Mode: Viewing all courses (${courses.length})`
+              : `Koleksi materi pembelajaran milik ${user?.username || user?.email}`
+            }
+          </p>
+        </div>
 
         {/* Draft Section */}
         {draftState && (
@@ -193,15 +154,12 @@ export default function MyCourses() {
                     <div className="flex flex-wrap gap-2 mt-2">
                       {course.topics.slice(0, 3).map(tid => {
                         const topic = RECOMMENDED_TOPICS.find(t => t.id === tid);
-                        return (
-                          <div key={tid} className="bg-secondary px-2 py-1 rounded text-xs flex items-center gap-1">
-                            <TopicIcon 
-                              icon={topic?.icon || ""} 
-                              className={cn("w-3 h-3", topic?.icon?.startsWith("http") ? "object-contain" : "")}
-                            />
-                            <span className="opacity-70">{tid}</span>
-                          </div>
-                        );
+                        if (!topic) return null;
+                        
+                        if (topic.icon.startsWith("http") || topic.icon.endsWith(".svg")) {
+                          return <img src={topic.icon} alt={topic.name} className="w-4 h-4 object-contain" />;
+                        }
+                        return <span>{topic.icon}</span>;
                       })}
                       {course.topics.length > 3 && (
                         <span className="text-xs text-muted-foreground self-center">

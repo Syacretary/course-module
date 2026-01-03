@@ -1,187 +1,311 @@
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, BookOpen, Sparkles, Zap, Target, Layers, Users, Globe, Bot, Heart } from "lucide-react";
+import { ArrowRight, Zap, Globe, Bot, Play, Cpu } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import anime from "animejs/lib/anime.es.js";
+import { Header } from "@/components/Header";
+import { CursorGlow } from "@/components/CursorGlow";
 
 export default function Index() {
   const { user } = useAuth();
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Animation Init
+  useEffect(() => {
+    // 1. Hero Text Stagger Effect
+    if (titleRef.current) {
+      const textWrapper = titleRef.current;
+      textWrapper.innerHTML = textWrapper.textContent!.replace(/\S/g, "<span class='letter inline-block'>$&</span>");
+
+      anime.timeline({ loop: false })
+        .add({
+          targets: '.letter',
+          translateY: [100, 0],
+          translateZ: 0,
+          opacity: [0, 1],
+          easing: "easeOutExpo",
+          duration: 1400,
+          delay: (el, i) => 300 + 30 * i
+        });
+    }
+
+    // 2. Bento Grid Spring Reveal
+    anime({
+      targets: '.bento-card',
+      scale: [0.8, 1],
+      opacity: [0, 1],
+      delay: anime.stagger(100, { start: 1000 }),
+      easing: 'spring(1, 80, 10, 0)'
+    });
+
+    // 3. Complex Background Particle System
+    if (canvasRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const resizeCanvas = () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      };
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+
+      const particles: any[] = [];
+      const createParticle = () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        radius: Math.random() * 2 + 1,
+        color: Math.random() > 0.5 ? '#7c3aed' : '#db2777', // Primary / Pink
+        alpha: Math.random() * 0.5 + 0.1,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5
+      });
+
+      for (let i = 0; i < 50; i++) particles.push(createParticle());
+
+      const animation = anime({
+        duration: Infinity,
+        update: () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          particles.forEach(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            
+            // Bounce off edges
+            if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+            if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+            ctx.globalAlpha = p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.fill();
+          });
+          
+          // Draw connections
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 0.5;
+          for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
+              const dx = particles[i].x - particles[j].x;
+              const dy = particles[i].y - particles[j].y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < 150) {
+                ctx.globalAlpha = (1 - dist / 150) * 0.2;
+                ctx.beginPath();
+                ctx.moveTo(particles[i].x, particles[i].y);
+                ctx.lineTo(particles[j].x, particles[j].y);
+                ctx.stroke();
+              }
+            }
+          }
+        }
+      });
+
+      // Mouse interaction
+      const handleMouseMove = (e: MouseEvent) => {
+        particles.forEach(p => {
+          const dx = p.x - e.clientX;
+          const dy = p.y - e.clientY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 200) {
+            const angle = Math.atan2(dy, dx);
+            p.vx += Math.cos(angle) * 0.05;
+            p.vy += Math.sin(angle) * 0.05;
+          }
+        });
+      };
+      window.addEventListener('mousemove', handleMouseMove);
+
+      return () => {
+        window.removeEventListener('resize', resizeCanvas);
+        window.removeEventListener('mousemove', handleMouseMove);
+        animation.pause();
+      };
+    }
+  }, []);
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-8 h-8 text-primary" />
-            <span className="font-display font-bold text-xl hidden sm:inline-block">Course Module</span>
-          </div>
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden font-sans selection:bg-primary/20 relative">
+      
+      <CursorGlow />
+      
+      {/* AnimeJS Canvas Background */}
+      <canvas ref={canvasRef} className="fixed top-0 left-0 w-full h-full pointer-events-none opacity-30 z-0" />
+
+      <Header />
+
+      {/* 2. Hero Section */}
+      <header className="relative min-h-screen flex flex-col justify-center px-6 pt-20 z-10">
+        <div className="container mx-auto grid lg:grid-cols-12 gap-12 items-center">
           
-          <div className="flex items-center gap-3 md:gap-4">
-            {user ? (
-               <Link to="/my-courses">
-                <Button variant="ghost" className="text-sm font-medium">Dashboard</Button>
-              </Link>
-            ) : (
-              <Link to="/login">
-                <Button variant="ghost" className="text-sm font-medium">Masuk</Button>
-              </Link>
-            )}
+          <div className="lg:col-span-8 space-y-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/5 text-primary text-xs font-mono tracking-widest uppercase mb-4 opacity-0 animate-[fadeIn_1s_ease-out_1s_forwards]">
+              <span className="w-2 h-2 rounded-full bg-primary animate-ping" />
+              System Online v2.0
+            </div>
             
-            <Link to="/make-course">
-              <Button className="gradient-primary shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all">
-                Buat Modul
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </Link>
+            <h1 ref={titleRef} className="text-6xl sm:text-7xl md:text-8xl font-display font-black leading-[0.9] tracking-tighter text-glow overflow-hidden">
+              STOP LEARNING
+            </h1>
+            <h1 className="text-6xl sm:text-7xl md:text-8xl font-display font-black leading-[0.9] tracking-tighter text-glow opacity-0 animate-[slideUp_1s_ease-out_0.5s_forwards]">
+              <span className="text-gradient-safe">START UPLOADING</span>
+            </h1>
+            
+            <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl leading-relaxed font-light border-l-4 border-primary pl-6 opacity-0 animate-[fadeIn_1s_ease-out_1.5s_forwards]">
+              Otakmu bukan gudang hapalan. Kurikura adalah <strong className="text-foreground">Neural Interface</strong> yang mengubah dokumentasi teknis menjadi skill siap pakai dalam hitungan detik.
+            </p>
+
+            <div className="flex flex-wrap gap-4 pt-4 opacity-0 animate-[fadeIn_1s_ease-out_2s_forwards]">
+              <Link to="/make-course">
+                <Button 
+                  className="h-16 px-8 rounded-none bg-foreground text-background hover:bg-primary hover:text-white text-lg font-bold tracking-wide transition-all border-2 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[4px] hover:translate-y-[4px] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
+                  onMouseEnter={(e) => anime({ targets: e.currentTarget, scale: 1.05, duration: 800 })}
+                  onMouseLeave={(e) => anime({ targets: e.currentTarget, scale: 1, duration: 600 })}
+                >
+                  GENERATE SKILL
+                  <Zap className="ml-2 w-5 h-5" />
+                </Button>
+              </Link>
+              <a href="#demo">
+                <Button variant="outline" className="h-16 px-8 rounded-none border-2 text-lg font-medium hover:bg-secondary">
+                  <Play className="mr-2 w-5 h-5" />
+                  WATCH DEMO
+                </Button>
+              </a>
+            </div>
+          </div>
+
+          <div className="lg:col-span-4 relative hidden lg:block opacity-0 animate-[fadeIn_2s_ease-out_1s_forwards]">
+            <div className="relative w-full aspect-[3/4] glass-panel rounded-xl p-6 flex flex-col gap-4 bento-card">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div className="flex gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                </div>
+                <span className="text-xs font-mono text-muted-foreground">learning_module.tsx</span>
+              </div>
+              <div className="flex-1 font-mono text-sm space-y-2 opacity-80" id="code-content">
+                <p><span className="text-purple-400">const</span> <span className="text-blue-400">knowledge</span> = <span className="text-yellow-400">await</span> ai.generate();</p>
+                <p><span className="text-purple-400">if</span> (user.ready) {'{'}</p>
+                <p className="pl-4 text-green-400">brain.upload(knowledge);</p>
+                <p className="pl-4 text-muted-foreground">// Dopamine levels rising...</p>
+                <p className="pl-4">skill.level++;</p>
+                <p>{'}'}</p>
+              </div>
+              <div className="mt-auto pt-4 border-t border-white/10">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span>STATUS:</span>
+                  <span className="text-green-400 animate-pulse">CONNECTED</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="container py-20 md:py-32 px-4 md:px-6">
-        <div className="flex flex-col items-center text-center space-y-8 max-w-5xl mx-auto">
-          <div className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium animate-fade-in text-center">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Powered by</span>
-            <span className="flex items-center gap-1 font-semibold">
-              Groq <Zap className="w-3 h-3 fill-current" />
-            </span>
-            <span className="opacity-50">,</span>
-            <span className="flex items-center gap-1 font-semibold">
-              Google <Bot className="w-3 h-3" />
-            </span>
-            <span className="opacity-50">&</span>
-            <span className="flex items-center gap-1 font-semibold">
-              Lovable <Heart className="w-3 h-3 fill-current" />
-            </span>
-          </div>
-          
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-display font-bold leading-[1.1] tracking-tight text-balance">
-            Kuasai Skill Baru dengan Kurikulum
-            <br className="hidden md:block" />
-            <span className="text-gradient-primary px-2">Personal & Modular</span>
-          </h1>
-          
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed text-balance">
-            Lupakan video tutorial yang panjang dan membosankan. 
-            Dapatkan modul pembelajaran berbasis teks yang <span className="text-foreground font-medium">to-the-point</span>, 
-            kode interaktif, dan studi kasus nyata yang dirancang khusus untuk level Anda.
-          </p>
+      {/* 3. Marquee */}
+      <div className="py-8 bg-foreground text-background overflow-hidden whitespace-nowrap border-y border-border transform -rotate-1 origin-left scale-105 z-20 relative">
+        <div className="inline-block animate-marquee font-mono text-xl font-bold tracking-widest">
+          REACT • PYTHON • DOCKER • KUBERNETES • RUST • MACHINE LEARNING • SYSTEM DESIGN • BLOCKCHAIN • REACT • PYTHON •
+        </div>
+      </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 pt-6 w-full sm:w-auto">
-            <Link to="/make-course" className="w-full sm:w-auto">
-              <Button size="lg" className="gradient-primary w-full sm:px-8 sm:py-6 text-lg h-12 sm:h-14 shadow-xl shadow-primary/20 hover:scale-105 transition-transform">
-                <BookOpen className="w-5 h-5 mr-2" />
-                Mulai Belajar Sekarang
-              </Button>
-            </Link>
-            <Link to="/my-courses" className="w-full sm:w-auto">
-              <Button size="lg" variant="outline" className="w-full sm:px-8 sm:py-6 text-lg h-12 sm:h-14 bg-background/50 backdrop-blur-sm hover:bg-secondary/80">
-                Lihat Contoh Modul
-              </Button>
-            </Link>
-          </div>
+      {/* 4. Bento Grid */}
+      <section id="features" className="container mx-auto py-32 px-6 z-10 relative">
+        <div className="mb-20">
+          <h2 className="text-4xl md:text-6xl font-display font-black mb-6">THE ENGINE</h2>
+          <p className="text-xl text-muted-foreground max-w-xl">Kami tidak menggunakan metode kuno. Ini adalah arsitektur pembelajaran masa depan.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 grid-rows-2 gap-4 h-auto md:h-[600px]" ref={gridRef}>
           
-          <div className="pt-8 text-sm text-muted-foreground flex items-center justify-center gap-6">
-            <div className="flex items-center gap-2">
-              <Globe className="w-4 h-4 text-primary" />
-              <span>Multi-Provider AI</span>
+          <div className="bento-card md:col-span-2 row-span-2 bg-secondary/30 border border-border p-8 flex flex-col justify-between hover:bg-secondary/50 transition-colors group">
+            <div>
+              <div className="w-12 h-12 bg-primary text-white flex items-center justify-center rounded-none mb-6">
+                <Cpu className="w-6 h-6" />
+              </div>
+              <h3 className="text-2xl font-bold mb-2">Multi-Agent Intelligence</h3>
+              <p className="text-muted-foreground">Bukan satu, tapi LIMA AI bekerja paralel. Satu meriset, satu menyusun kurikulum, satu menulis kode, satu menguji validitas.</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-primary" />
-              <span>Personalized Path</span>
+            <div className="mt-8 opacity-50 group-hover:opacity-100 transition-opacity">
+              <div className="h-2 bg-background rounded overflow-hidden">
+                <div className="h-full bg-primary w-0 group-hover:w-3/4 transition-all duration-1000 ease-out" />
+              </div>
+              <div className="flex justify-between text-xs mt-2 font-mono">
+                <span>PROCESSING</span>
+                <span>75%</span>
+              </div>
             </div>
           </div>
+
+          <div className="bento-card md:col-span-1 bg-card border border-border p-6 hover:border-primary transition-colors cursor-pointer"
+               onMouseEnter={(e) => anime({ targets: e.currentTarget, translateY: -5, boxShadow: '0 10px 20px rgba(0,0,0,0.1)' })}
+               onMouseLeave={(e) => anime({ targets: e.currentTarget, translateY: 0, boxShadow: '0 0 0 rgba(0,0,0,0)' })}>
+            <Bot className="w-8 h-8 mb-4 text-purple-500" />
+            <h3 className="text-lg font-bold">Google Gemini 2.0</h3>
+            <p className="text-sm text-muted-foreground mt-2">Konteks window massive untuk pemahaman mendalam.</p>
+          </div>
+
+          <div className="bento-card md:col-span-1 bg-card border border-border p-6 hover:border-primary transition-colors cursor-pointer"
+               onMouseEnter={(e) => anime({ targets: e.currentTarget, translateY: -5, boxShadow: '0 10px 20px rgba(0,0,0,0.1)' })}
+               onMouseLeave={(e) => anime({ targets: e.currentTarget, translateY: 0, boxShadow: '0 0 0 rgba(0,0,0,0)' })}>
+            <Zap className="w-8 h-8 mb-4 text-orange-500" />
+            <h3 className="text-lg font-bold">Groq LPU™</h3>
+            <p className="text-sm text-muted-foreground mt-2">Kecepatan inferensi 500 token/detik. Tanpa loading.</p>
+          </div>
+
+          <div className="bento-card md:col-span-2 bg-gradient-to-r from-gray-900 to-gray-800 text-white p-8 flex items-center justify-between overflow-hidden relative group">
+            <div className="relative z-10">
+              <h3 className="text-2xl font-bold mb-1">Open Source Models</h3>
+              <p className="text-gray-400">Llama 3.1 405B & DeepSeek R1</p>
+            </div>
+            <Globe className="w-24 h-24 text-white/10 absolute right-[-20px] bottom-[-20px] group-hover:rotate-45 transition-transform duration-700" />
+          </div>
+
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="container py-24 border-t border-border/50 bg-secondary/20">
-        <div className="text-center mb-16 max-w-3xl mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-display font-bold mb-6">
-            Mengapa Course Module Berbeda?
+      {/* 5. CTA */}
+      <section className="py-32 px-6 border-t border-border bg-background relative z-10">
+        <div className="container mx-auto text-center">
+          <h2 className="text-[12vw] font-display font-black leading-none opacity-5 select-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none w-full">
+            START NOW
           </h2>
-          <p className="text-muted-foreground text-lg">
-            Kami tidak hanya memberikan materi, kami membangun struktur pemahaman yang solid menggunakan teknologi Multi-Agent AI tercanggih.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8 px-4">
-          {/* Card 1 */}
-          <div className="p-8 rounded-3xl bg-card border border-border/50 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 group">
-            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
-              <Target className="w-7 h-7 text-primary" />
-            </div>
-            <h3 className="text-xl font-bold mb-3">Kurikulum Adaptif</h3>
-            <p className="text-muted-foreground leading-relaxed">
-              Tidak ada dua orang yang belajar dengan cara yang sama. AI kami menyesuaikan materi berdasarkan latar belakang, tujuan, dan waktu yang Anda miliki.
+          <div className="relative z-10">
+            <p className="text-2xl md:text-3xl font-light mb-8">
+              Masa depan milik mereka yang belajar paling cepat.
             </p>
-          </div>
-
-          {/* Card 2 */}
-          <div className="p-8 rounded-3xl bg-card border border-border/50 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 group">
-            <div className="w-14 h-14 rounded-2xl bg-teal-500/10 flex items-center justify-center mb-6 group-hover:bg-teal-500/20 transition-colors">
-              <Layers className="w-7 h-7 text-teal-600 dark:text-teal-400" />
-            </div>
-            <h3 className="text-xl font-bold mb-3">Arsitektur Modular</h3>
-            <p className="text-muted-foreground leading-relaxed">
-              Materi dipecah menjadi modul-modul kecil (bite-sized) yang mudah dicerna, memungkinkan Anda belajar di sela-sela kesibukan tanpa merasa kewalahan.
-            </p>
-          </div>
-
-          {/* Card 3 */}
-          <div className="p-8 rounded-3xl bg-card border border-border/50 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 group">
-            <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center mb-6 group-hover:bg-orange-500/20 transition-colors">
-              <Zap className="w-7 h-7 text-orange-600 dark:text-orange-400" />
-            </div>
-            <h3 className="text-xl font-bold mb-3">Live Context engine</h3>
-            <p className="text-muted-foreground leading-relaxed">
-              Berbeda dengan ChatGPT biasa, sistem kami membaca dokumentasi terbaru secara real-time untuk memastikan materi Anda tidak kadaluarsa.
-            </p>
+            <Link to="/make-course">
+              <Button size="lg" 
+                className="h-20 px-12 text-2xl rounded-none bg-foreground text-background hover:bg-primary hover:text-white border-2 border-foreground hover:border-primary shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)] hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none transition-all font-black tracking-tighter"
+                onMouseEnter={(e) => anime({ targets: e.currentTarget, scale: 1.05, duration: 800 })}
+                onMouseLeave={(e) => anime({ targets: e.currentTarget, scale: 1, duration: 600 })}
+              >
+                MULAI AKSES KURIKURA
+                <ArrowRight className="ml-3 w-10 h-10" />
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="container py-24 px-4">
-        <div className="relative overflow-hidden rounded-[2.5rem] bg-[#1e1e1e] border border-white/10 p-8 md:p-20 text-center shadow-2xl">
-          {/* Abstract Shapes */}
-          <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-            <div className="absolute -top-24 -left-24 w-96 h-96 bg-primary/20 rounded-full blur-[100px]" />
-            <div className="absolute top-1/2 -right-24 w-64 h-64 bg-purple-500/20 rounded-full blur-[80px]" />
-          </div>
-
-          <div className="relative z-10 max-w-2xl mx-auto">
-            <h2 className="text-3xl md:text-5xl font-display font-bold text-white mb-6">
-              Siap untuk Upgrade Skill?
-            </h2>
-            <p className="text-gray-300 text-lg mb-10">
-              Bergabunglah dengan ribuan pembelajar cerdas lainnya. Tanpa biaya langganan, tanpa iklan, murni ilmu pengetahuan.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/make-course">
-                <Button size="lg" className="w-full sm:w-auto bg-white text-black hover:bg-gray-200 border-none px-8 py-6 text-lg font-bold shadow-xl shadow-white/10 hover:scale-105 transition-transform">
-                  Buat Modul Belajarku
-                </Button>
-              </Link>
-            </div>
-          </div>
+      <footer className="py-12 px-6 border-t border-border flex flex-col md:flex-row justify-between items-center text-sm font-mono text-muted-foreground bg-background z-10 relative">
+        <div>
+          © 2026 KURIKURA INC. Made with love by <a href="https://syacretary.web.app" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-bold underline-offset-4">Syacretary</a> and AI.
         </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border py-12 bg-background">
-        <div className="container px-4 text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-             <BookOpen className="w-5 h-5 text-primary" />
-             <span className="font-bold">Course Module</span>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            © 2026 Course Module Platform. Built by <a href="https://syacretary.web.app" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">Syacretary</a> and AI.
-          </p>
+        <div className="flex gap-6 mt-4 md:mt-0">
+          <a href="#" className="hover:text-foreground">TWITTER</a>
+          <a href="#" className="hover:text-foreground">GITHUB</a>
+          <a href="#" className="hover:text-foreground">DISCORD</a>
         </div>
       </footer>
+
     </div>
   );
 }
-
