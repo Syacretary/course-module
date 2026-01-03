@@ -27,13 +27,6 @@ export function Header() {
 
       {/* Navigation */}
       <div className="flex items-center gap-4 md:gap-8 text-sm font-medium tracking-wide">
-        {isHome && (
-          <>
-            <a href="#manifesto" className="hidden md:inline-block hover:text-primary transition-colors">MANIFESTO</a>
-            <a href="#features" className="hidden md:inline-block hover:text-primary transition-colors">ENGINE</a>
-          </>
-        )}
-
         {user ? (
           <>
             <Link to="/my-courses" className={`hover:text-primary transition-colors ${location.pathname === '/my-courses' ? 'text-primary' : ''}`}>

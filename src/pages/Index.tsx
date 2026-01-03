@@ -295,14 +295,9 @@ export default function Index() {
         </div>
       </section>
 
-      <footer className="py-12 px-6 border-t border-border flex flex-col md:flex-row justify-between items-center text-sm font-mono text-muted-foreground bg-background z-10 relative">
-        <div>
+      <footer className="py-12 px-6 border-t border-border flex justify-center items-center text-sm font-mono text-muted-foreground bg-background z-10 relative">
+        <div className="text-center">
           © 2026 KURIKURA INC. Made with love by <a href="https://syacretary.web.app" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-bold underline-offset-4">Syacretary</a> and AI.
-        </div>
-        <div className="flex gap-6 mt-4 md:mt-0">
-          <a href="#" className="hover:text-foreground">TWITTER</a>
-          <a href="#" className="hover:text-foreground">GITHUB</a>
-          <a href="#" className="hover:text-foreground">DISCORD</a>
         </div>
       </footer>
 
