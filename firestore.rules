@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /courses/{courseId} {
+      // PERMISSION RULES
+      // 1. Only the owner of the course can read, update, or delete it.
+      // 2. Specialized access for the Admin email (rasya13485@gmail.com) to support Developer Mode.
+      allow read, update, delete: if request.auth != null && (
+        request.auth.uid == resource.data.userId || 
+        request.auth.token.email == 'rasya13485@gmail.com'
+      );
+      
+      // 3. Any authenticated user can create a new course as long as they set themselves as the owner.
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId;
+    }
+  }
+}

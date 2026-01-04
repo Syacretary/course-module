@@ -5,6 +5,8 @@ import {
   isSignInWithEmailLink, 
   signInWithEmailLink, 
   signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
   User as FirebaseUser
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -22,6 +24,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   toggleDevMode: () => void;
 }
@@ -85,7 +88,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string) => {
     const actionCodeSettings = {
-      // URL to redirect back to. Change this to your production domain later!
       url: window.location.origin + '/make-course', 
       handleCodeInApp: true,
     };
@@ -97,6 +99,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: any) {
       toast.error("Gagal mengirim email: " + error.message);
       throw error;
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      setLoading(true);
+      await signInWithPopup(auth, provider);
+      toast.success("Berhasil masuk dengan Google!");
+    } catch (error: any) {
+      toast.error("Gagal masuk dengan Google: " + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -125,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, toggleDevMode }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, logout, toggleDevMode }}>
       {children}
     </AuthContext.Provider>
   );

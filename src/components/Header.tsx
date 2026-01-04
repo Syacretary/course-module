@@ -18,24 +18,24 @@ export function Header() {
   const isHome = location.pathname === "/";
 
   return (
-    <nav className="fixed top-0 w-full z-50 px-6 py-6 flex justify-between items-center mix-blend-difference text-white">
+    <nav className="fixed top-0 w-full z-50 px-6 py-4 flex justify-between items-center bg-background/80 backdrop-blur-xl border-b border-border/50 shadow-sm">
       {/* Logo */}
       <Link to="/" className="flex items-center gap-2 group cursor-pointer" onMouseEnter={() => anime({ targets: '#logo-k-header', rotate: '1turn' })}>
         <img id="logo-k-header" src="/icon.png" alt="Kurikura" className="w-8 h-8 object-contain" />
-        <span className="font-display font-bold tracking-tighter text-xl">KURIKURA</span>
+        <span className="font-display font-bold tracking-tighter text-xl text-foreground">KURIKURA</span>
       </Link>
 
       {/* Navigation */}
       <div className="flex items-center gap-4 md:gap-8 text-sm font-medium tracking-wide">
         {user ? (
           <>
-            <Link to="/my-courses" className={`hover:text-primary transition-colors ${location.pathname === '/my-courses' ? 'text-primary' : ''}`}>
+            <Link to="/my-courses" className={`text-foreground/70 hover:text-primary transition-colors ${location.pathname === '/my-courses' ? 'text-primary' : ''}`}>
               DASHBOARD
             </Link>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="p-0 h-auto hover:bg-transparent text-white hover:text-primary">
+                <Button variant="ghost" className="p-0 h-auto hover:bg-transparent text-foreground/70 hover:text-primary">
                   <UserIcon className="w-5 h-5" />
                 </Button>
               </DropdownMenuTrigger>
@@ -65,15 +65,15 @@ export function Header() {
             </DropdownMenu>
           </>
         ) : (
-          <Link to="/login" className="hover:text-primary transition-colors">
+          <Link to="/login" className="text-foreground/70 hover:text-primary transition-colors">
             LOGIN
           </Link>
         )}
 
-        {/* CTA Button (Only show if not on make-course page to avoid redundancy) */}
+        {/* CTA Button */}
         {location.pathname !== "/make-course" && (
           <Link to="/make-course">
-            <Button className="rounded-none bg-white text-black hover:bg-primary hover:text-white border-none font-bold tracking-tighter transition-all">
+            <Button className="rounded-none bg-foreground text-background hover:bg-primary hover:text-white border-none font-bold tracking-tighter transition-all">
               GENERATE
               <ArrowRight className="ml-2 w-4 h-4" />
             </Button>

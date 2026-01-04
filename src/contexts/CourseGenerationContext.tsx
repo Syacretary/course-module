@@ -4,7 +4,7 @@ import { generatePersonalizationQuestions, generateFullCourse } from "@/lib/cour
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "@/contexts/AuthContext";
 
-import { collection, addDoc, Timestamp } from "firebase/firestore";
+import { collection, addDoc, Timestamp, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface CourseGenerationContextType {
@@ -39,27 +39,32 @@ const initialState: CourseGenerationState = {
 
 export function CourseGenerationProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  
-  // Initialize state from localStorage if available (Persistence)
-  const [state, setState] = useState<CourseGenerationState>(() => {
+  const [state, setState] = useState<CourseGenerationState>(initialState);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const getDraftKey = (uid: string | undefined) => uid ? `draft_course_state_${uid}` : "draft_course_state_guest";
+
+  // Load draft when user changes
+  useEffect(() => {
     try {
-      const saved = localStorage.getItem("draft_course_state");
+      const key = getDraftKey(user?.id);
+      const saved = localStorage.getItem(key);
       if (saved) {
-        return JSON.parse(saved);
+        setState(JSON.parse(saved));
+      } else {
+        setState(initialState);
       }
     } catch (e) {
       console.error("Failed to load draft state", e);
     }
-    return initialState;
-  });
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  }, [user?.id]);
 
   // Save state to localStorage on change
   useEffect(() => {
-    localStorage.setItem("draft_course_state", JSON.stringify(state));
-  }, [state]);
+    const key = getDraftKey(user?.id);
+    localStorage.setItem(key, JSON.stringify(state));
+  }, [state, user?.id]);
 
   const toggleTopic = useCallback((topicId: string) => {
     setState((prev) => {
@@ -139,6 +144,22 @@ export function CourseGenerationProvider({ children }: { children: React.ReactNo
         answer: a.answer,
       }));
 
+      // Create Initial Draft Document in Firestore
+      const draftData = {
+        userId: user.id,
+        title: `Draft: ${allTopics.join(", ")}`,
+        description: "Sedang dikerjakan...",
+        topics: allTopics,
+        chapters: [],
+        createdAt: Timestamp.now(),
+        isDeleted: false,
+        isFavorite: false,
+        status: "generating" // Track status
+      };
+
+      const docRef = await addDoc(collection(db, "courses"), draftData);
+      const currentChapters: any[] = [];
+
       const courseData = await generateFullCourse(
         allTopics,
         answersWithQuestions,
@@ -147,27 +168,36 @@ export function CourseGenerationProvider({ children }: { children: React.ReactNo
             ...prev,
             generationProgress: { phase, current, total },
           }));
+        },
+        async (finishedChapter) => {
+          // Incrementally save each chapter to Firestore
+          currentChapters.push(finishedChapter);
+          await updateDoc(docRef, {
+            chapters: currentChapters,
+            title: `Kurikulum ${allTopics[0]} - ${currentChapters.length}/6 Bab`
+          });
         }
       );
 
-      const courseDataToSave = {
+      // Final Update to Course
+      const course: Course = {
+        id: docRef.id,
         userId: user.id,
         title: courseData.title,
         description: courseData.description,
         topics: allTopics,
         chapters: courseData.chapters,
-        createdAt: Timestamp.now(),
-        isDeleted: false,
-        isFavorite: false
-      };
-
-      const docRef = await addDoc(collection(db, "courses"), courseDataToSave);
-
-      const course: Course = {
-        id: docRef.id,
-        ...courseDataToSave,
         createdAt: new Date(),
+        isFavorite: false,
+        isDeleted: false
       };
+
+      await updateDoc(docRef, {
+        title: courseData.title,
+        description: courseData.description,
+        chapters: courseData.chapters,
+        status: "complete"
+      });
 
       setState((prev) => ({
         ...prev,
@@ -175,12 +205,13 @@ export function CourseGenerationProvider({ children }: { children: React.ReactNo
         course,
       }));
 
-      // Clear draft
-      localStorage.removeItem("draft_course_state");
+      // Clear local draft
+      const key = getDraftKey(user.id);
+      localStorage.removeItem(key);
 
     } catch (err) {
+      console.error("Generation failed:", err);
       setError(err instanceof Error ? err.message : "Failed to generate course");
-      // Don't reset state fully so user can retry
       setState((prev) => ({ ...prev, step: "personalization" }));
     } finally {
       setIsLoading(false);
