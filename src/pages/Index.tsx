@@ -149,10 +149,10 @@ export default function Index() {
               System Online v2.0
             </div>
             
-            <h1 ref={titleRef} className="text-6xl sm:text-7xl md:text-8xl font-display font-black leading-[0.9] tracking-tighter text-glow overflow-hidden">
+            <h1 ref={titleRef} className="text-6xl sm:text-7xl md:text-8xl font-display font-black leading-[0.9] tracking-tighter overflow-hidden text-balance">
               STOP LEARNING
             </h1>
-            <h1 className="text-6xl sm:text-7xl md:text-8xl font-display font-black leading-[0.9] tracking-tighter text-glow opacity-0 animate-[slideUp_1s_ease-out_0.5s_forwards]">
+            <h1 className="text-6xl sm:text-7xl md:text-8xl font-display font-black leading-[0.9] tracking-tighter opacity-0 animate-[slideUp_1s_ease-out_0.5s_forwards] text-balance">
               <span className="text-gradient-safe">START UPLOADING</span>
             </h1>
             

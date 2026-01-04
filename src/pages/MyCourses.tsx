@@ -154,12 +154,15 @@ export default function MyCourses() {
                     <div className="flex flex-wrap gap-2 mt-2">
                       {course.topics.slice(0, 3).map(tid => {
                         const topic = RECOMMENDED_TOPICS.find(t => t.id === tid);
-                        if (!topic) return null;
-                        
-                        if (topic.icon.startsWith("http") || topic.icon.endsWith(".svg")) {
-                          return <img src={topic.icon} alt={topic.name} className="w-4 h-4 object-contain" />;
-                        }
-                        return <span>{topic.icon}</span>;
+                        return (
+                          <div key={tid} className="bg-secondary px-2 py-1 rounded text-xs flex items-center gap-1">
+                            <TopicIcon 
+                              icon={topic?.icon || ""} 
+                              className={cn("w-3 h-3", topic?.icon?.startsWith("http") ? "object-contain" : "")} 
+                            />
+                            <span className="opacity-70">{tid}</span>
+                          </div>
+                        );
                       })}
                       {course.topics.length > 3 && (
                         <span className="text-xs text-muted-foreground self-center">

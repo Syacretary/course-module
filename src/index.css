@@ -30,10 +30,6 @@
 }
 
 @layer utilities {
-  .text-glow {
-    text-shadow: 0 0 20px rgba(124, 58, 237, 0.5);
-  }
-
   /* Teknik Gradasi Aman: Ada fallback warna ungu jika clipping gagal */
   .text-gradient-safe {
     background-image: linear-gradient(to right, #7c3aed, #db2777, #f43f5e);
@@ -56,6 +52,12 @@
   
   .animate-float {
     animation: float 6s ease-in-out infinite;
+  }
+
+  /* Menghilangkan backtick otomatis dari Tailwind Typography */
+  .prose code::before,
+  .prose code::after {
+    content: "" !important;
   }
 
   @keyframes float {

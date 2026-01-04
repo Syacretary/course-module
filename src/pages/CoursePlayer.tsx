@@ -79,12 +79,6 @@ export default function CoursePlayer() {
       <Header />
 
       <div className="h-screen flex flex-col pt-20 relative z-10">
-        <div className="bg-card/50 backdrop-blur-sm border-b p-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/my-courses")}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="font-semibold line-clamp-1">{course.title}</h1>
-        </div>
         <div className="flex-1 overflow-hidden">
           <CourseViewer 
             course={course} 
