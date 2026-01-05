@@ -2,40 +2,40 @@ import { callGroq, parseJSON, GROQ_MODELS } from "@/lib/groq";
 import { PersonalizationQuestion, Chapter, SubMaterial } from "@/types/course";
 import { getRoadmapContent } from "@/lib/roadmap-scraper";
 
-// Agent 1: Generate personalization questions
+// Agent 2: Personalization Questioner - generates 3 deep context-aware questions
 export async function generatePersonalizationQuestions(
   topics: string[]
 ): Promise<PersonalizationQuestion[]> {
   const topicsStr = topics.join(", ");
-  
-  const prompt = `Kamu adalah AI yang membantu membuat pertanyaan personalisasi untuk course generator.
-Topik yang dipilih pengguna: ${topicsStr}
+  const prompt = `Kamu adalah AI Mentor yang sangat cerdas dan empatik. 
+Seorang pengguna ingin belajar tentang: ${topicsStr}
 
-Buatkan 4-5 pertanyaan personalisasi untuk menyesuaikan course dengan kebutuhan pengguna.
-Pertanyaan harus fokus pada:
-1. Tujuan belajar (untuk apa mempelajari topik ini)
-2. Level pengalaman saat ini
-3. Latar belakang teknis yang sudah dimiliki
-4. Preferensi cara belajar
-5. Waktu yang tersedia untuk belajar
+Tugasmu adalah merancang 3 pertanyaan wawancara singkat untuk memahami latar belakang dan tujuan mereka agar kurikulum yang dibuat sangat personal (custom-tailored).
+
+Setiap pertanyaan harus memiliki:
+1. Pertanyaan yang ramah dan suportif.
+2. 3-4 opsi jawaban cepat (chips) yang paling relevan untuk topik tersebut.
+
+CONTOH (Jika topik Desain UI/UX):
+Q1: "Apa statusmu saat ini?" (Pelajar/Mahasiswa, Profesional ingin switch career, Entrepreneur)
+Q2: "Seberapa familiar kamu dengan tools desain seperti Figma atau Adobe XD?" (Benar-benar baru, Tahu dasar-dasarnya, Sudah sering pakai)
+Q3: "Tujuan utamamu apa?" (Buat nambah portofolio, Belajar buat kerjaan sekarang, Iseng eksplor hobi)
 
 Format output JSON:
 {
   "questions": [
     {
       "id": "q1",
-      "question": "Pertanyaan disini?",
-      "suggestedAnswers": ["Jawaban 1", "Jawaban 2", "Jawaban 3", "Jawaban 4", "Jawaban 5"]
+      "question": "Teks pertanyaan",
+      "suggestedAnswers": ["Opsi 1", "Opsi 2", "Opsi 3"]
     }
   ]
-}
-
-Pastikan jawaban yang disarankan relevan dan mencakup berbagai kemungkinan.`;
+}`;
 
   const response = await callGroq([
-    { role: "system", content: "Kamu adalah AI assistant yang membantu membuat pertanyaan personalisasi dalam bahasa Indonesia. Output harus dalam format JSON yang valid." },
+    { role: "system", content: "Kamu adalah AI Mentor Kurikura yang ahli dalam merancang pengalaman belajar personal. Kamu menggunakan bahasa Indonesia yang ramah, profesional, dan cerdas. Output harus JSON valid." },
     { role: "user", content: prompt }
-  ], GROQ_MODELS.FAST, 0.7);
+  ], GROQ_MODELS.POWERFUL, 0.7);
 
   const parsed = parseJSON<{ questions: PersonalizationQuestion[] }>(response);
   return parsed.questions;

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
-import { CourseGenerationState, Course } from "@/types/course";
+import { CourseGenerationState, Course, SyllabusChapter } from "@/types/course";
 import { generatePersonalizationQuestions, generateFullCourse } from "@/lib/course-agents";
+import { generateSyllabusBlueprint } from "@/lib/syllabus-agent";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -15,8 +16,13 @@ interface CourseGenerationContextType {
   setCustomTopic: (topic: string) => void;
   proceedToPersonalization: () => Promise<void>;
   setAnswer: (questionId: string, answer: string) => void;
+  generateSyllabus: () => Promise<void>;
+  setSyllabus: (plan: SyllabusChapter[]) => void;
+  updateSyllabusChapter: (index: number, chapter: SyllabusChapter) => void;
+  deleteSyllabusChapter: (index: number) => void;
   startCourseGeneration: () => Promise<void>;
   reset: () => void;
+  startNewSession: (topic: string) => void;
   canProceedToPersonalization: boolean;
   canStartGeneration: boolean;
 }
@@ -35,6 +41,7 @@ const initialState: CourseGenerationState = {
     total: 0,
   },
   course: null,
+  syllabusPlan: undefined
 };
 
 export function CourseGenerationProvider({ children }: { children: React.ReactNode }) {
@@ -51,7 +58,15 @@ export function CourseGenerationProvider({ children }: { children: React.ReactNo
       const key = getDraftKey(user?.id);
       const saved = localStorage.getItem(key);
       if (saved) {
-        setState(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        
+        // Validation: Prevent zombie states
+        if (parsed.step === 'syllabus' && (!parsed.syllabusPlan || parsed.syllabusPlan.length === 0)) {
+          console.warn("Found broken syllabus state, reverting to personalization.");
+          parsed.step = 'personalization';
+        }
+
+        setState(parsed);
       } else {
         setState(initialState);
       }
@@ -123,6 +138,54 @@ export function CourseGenerationProvider({ children }: { children: React.ReactNo
     }));
   }, []);
 
+  // Generate Syllabus Blueprint
+  const generateSyllabus = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const topics = state.customTopic || state.selectedTopics.join(", ");
+      const answersWithQuestions = state.answers.map((a) => ({
+        question: state.questions.find((q) => q.id === a.questionId)?.question || "",
+        answer: a.answer,
+      }));
+
+      const plan = await generateSyllabusBlueprint(topics, answersWithQuestions);
+      
+      setState(prev => ({
+        ...prev,
+        step: 'syllabus',
+        syllabusPlan: plan
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal menyusun silabus");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [state.customTopic, state.selectedTopics, state.answers, state.questions]);
+
+  const setSyllabus = useCallback((plan: SyllabusChapter[]) => {
+    setState(prev => ({ ...prev, syllabusPlan: plan }));
+  }, []);
+
+  const updateSyllabusChapter = useCallback((index: number, chapter: SyllabusChapter) => {
+    setState(prev => {
+      const newPlan = [...(prev.syllabusPlan || [])];
+      newPlan[index] = chapter;
+      return { ...prev, syllabusPlan: newPlan };
+    });
+  }, []);
+
+  const deleteSyllabusChapter = useCallback((index: number) => {
+    setState(prev => {
+      const newPlan = [...(prev.syllabusPlan || [])];
+      newPlan.splice(index, 1);
+      return { 
+        ...prev, 
+        syllabusPlan: newPlan.map((c, i) => ({ ...c, number: i + 1 })) 
+      };
+    });
+  }, []);
+
   const startCourseGeneration = useCallback(async () => {
     if (!user) {
       setError("Please login to generate a course");
@@ -131,7 +194,7 @@ export function CourseGenerationProvider({ children }: { children: React.ReactNo
 
     setIsLoading(true);
     setError(null);
-    setState((prev) => ({ ...prev, step: "generating" }));
+    setState((prev) => ({ ...prev, step: "generation" }));
 
     try {
       const allTopics = [
@@ -154,7 +217,7 @@ export function CourseGenerationProvider({ children }: { children: React.ReactNo
         createdAt: Timestamp.now(),
         isDeleted: false,
         isFavorite: false,
-        status: "generating" // Track status
+        status: "generating"
       };
 
       const docRef = await addDoc(collection(db, "courses"), draftData);
@@ -170,13 +233,13 @@ export function CourseGenerationProvider({ children }: { children: React.ReactNo
           }));
         },
         async (finishedChapter) => {
-          // Incrementally save each chapter to Firestore
           currentChapters.push(finishedChapter);
           await updateDoc(docRef, {
             chapters: currentChapters,
-            title: `Kurikulum ${allTopics[0]} - ${currentChapters.length}/6 Bab`
+            title: `Kurikulum ${allTopics[0]} - ${currentChapters.length}/${state.syllabusPlan?.length || 6} Bab`
           });
-        }
+        },
+        state.syllabusPlan
       );
 
       // Final Update to Course
@@ -205,7 +268,6 @@ export function CourseGenerationProvider({ children }: { children: React.ReactNo
         course,
       }));
 
-      // Clear local draft
       const key = getDraftKey(user.id);
       localStorage.removeItem(key);
 
@@ -216,13 +278,24 @@ export function CourseGenerationProvider({ children }: { children: React.ReactNo
     } finally {
       setIsLoading(false);
     }
-  }, [state.selectedTopics, state.customTopic, state.questions, state.answers, user]);
+  }, [state.selectedTopics, state.customTopic, state.questions, state.answers, user, state.syllabusPlan]);
 
   const reset = useCallback(() => {
     setState(initialState);
-    localStorage.removeItem("draft_course_state");
+    const key = getDraftKey(user?.id);
+    localStorage.removeItem(key);
     setError(null);
-  }, []);
+  }, [user?.id]);
+
+  const startNewSession = useCallback((topic: string) => {
+    setState({
+      ...initialState,
+      customTopic: topic,
+    });
+    const key = getDraftKey(user?.id);
+    localStorage.removeItem(key);
+    setError(null);
+  }, [user?.id]);
 
   const canProceedToPersonalization = 
     state.selectedTopics.length > 0 || state.customTopic.trim() !== "";
@@ -239,8 +312,13 @@ export function CourseGenerationProvider({ children }: { children: React.ReactNo
       setCustomTopic,
       proceedToPersonalization,
       setAnswer,
+      generateSyllabus,
+      setSyllabus,
+      updateSyllabusChapter,
+      deleteSyllabusChapter,
       startCourseGeneration,
       reset,
+      startNewSession,
       canProceedToPersonalization,
       canStartGeneration
     }}>

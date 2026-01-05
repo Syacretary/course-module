@@ -41,16 +41,26 @@ export interface Course {
   isDeleted?: boolean; // Soft delete flag
 }
 
+export interface ChatMessage {
+  id: string;
+  role: "ai" | "user";
+  content: string;
+  options?: string[]; // Suggested answers for AI messages
+  isTyping?: boolean; // For typewriter effect
+}
+
+export interface SyllabusChapter {
+  id: string;
+  number: number;
+  title: string;
+  description: string; // Rationale/Goal
+  topics: string[]; // Keywords/Sub-concepts
+}
+
 export interface CourseGenerationState {
-  step: "topics" | "personalization" | "generating" | "complete";
+  step: 'topics' | 'personalization' | 'syllabus' | 'generation' | 'complete';
   selectedTopics: string[];
-  customTopic: string;
-  questions: PersonalizationQuestion[];
-  answers: PersonalizationAnswer[];
-  generationProgress: {
-    phase: string;
-    current: number;
-    total: number;
-  };
+  // ... (keep rest)
   course: Course | null;
+  syllabusPlan?: SyllabusChapter[];
 }

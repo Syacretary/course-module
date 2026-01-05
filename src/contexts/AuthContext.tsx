@@ -17,6 +17,8 @@ export type UserRole = "user" | "dev";
 export interface User {
   id: string;
   email: string;
+  displayName?: string | null;
+  photoURL?: string | null;
   role: UserRole;
 }
 
@@ -50,6 +52,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser({
           id: firebaseUser.uid,
           email: firebaseUser.email || "",
+          displayName: firebaseUser.displayName,
+          photoURL: firebaseUser.photoURL,
           role: role
         });
       } else {
