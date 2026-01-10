@@ -1,74 +1,87 @@
-# Welcome to your Lovable project
+# 🎓 Kurikura: AI-Powered Personalized Learning Architect
 
-## Project info
+**Kurikura** adalah platform pembelajaran cerdas yang merancang jalur belajar (learning path) yang sepenuhnya personal untuk setiap pengguna. Menggunakan arsitektur Multi-Agent AI, Kurikura tidak hanya memberikan daftar materi, tetapi menyusun kurikulum mendalam yang divalidasi dan berbasis riset terbaru.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+---
 
-## How can I edit this code?
+## ✨ Fitur Utama
 
-There are several ways of editing your application.
+### 🧠 1. Personalization Engine
+Kurikura memahami bahwa setiap orang memiliki latar belakang berbeda. AI akan mewawancarai Anda secara singkat untuk memahami tujuan, tingkat keahlian, dan preferensi belajar Anda sebelum menyusun materi.
 
-**Use Lovable**
+### 🏗️ 2. Syllabus Architect
+Menghasilkan silabus terstruktur (biasanya 6-8 minggu) yang progresif—mulai dari fundamental hingga proyek akhir—disesuaikan dengan profil unik Anda.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### 🕵️ 3. Intelligent Research Agents
+Konten yang dihasilkan bukan sekadar halusinasi AI. Kurikura memiliki agen riset yang mampu:
+- 🗺️ **Roadmap Scraper**: Mengambil referensi dari *roadmap.sh* untuk standar industri.
+- 🔍 **Web Search**: Mencari kurikulum dan panduan terbaru dari Google.
+- 📚 **Academic & Knowledge Search**: Mengintegrasikan data dari *Wikipedia* dan *ArXiv* untuk kedalaman materi.
 
-Changes made via Lovable will be committed automatically to this repo.
+### ✍️ 4. Educator Master & QA System
+- **Educator Agent**: Menulis konten edukasi yang engaging, menggunakan prinsip neurosains untuk memudahkan pemahaman.
+- **QA Agent**: Setiap materi yang dihasilkan melewati proses validasi otomatis untuk memastikan akurasi teknis, koherensi, dan kualitas format markdown.
 
-**Use your preferred IDE**
+### 📖 5. Immersive Learning Experience
+- **Immersive Reader**: Antarmuka baca yang bersih dengan fokus pada konten.
+- **Progress Locking**: Sistem manajemen belajar yang memastikan Anda benar-benar memahami satu bagian sebelum pindah ke bagian lain.
+- **AI Tutor Integration**: Butuh penjelasan lebih lanjut? Anda bisa menyorot teks dan bertanya langsung pada AI Tutor di dalam aplikasi.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+---
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🛠️ Tech Stack
 
-Follow these steps:
+### Frontend
+- **React (TypeScript)** & **Vite**: Untuk performa dan pengalaman developer yang optimal.
+- **Tailwind CSS** & **Shadcn UI**: Antarmuka modern, responsif, dan elegan.
+- **Framer Motion**: Animasi transisi yang halus dan interaktif.
+- **Firebase Auth & Firestore**: Autentikasi pengguna dan penyimpanan data kurikulum secara real-time.
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Backend & AI Proxy
+- **Node.js (Express)** & **Vercel Functions**: Sebagai jembatan (proxy) yang aman ke penyedia AI.
+- **Load Balanced AI Providers**: Menggunakan strategi fallback antar provider untuk keandalan maksimal:
+  - **Groq (Llama 3.1 & 3.3)**: Untuk generasi cepat.
+  - **Google Gemini 2.0 Flash**: Untuk pemrosesan konteks tinggi.
+  - **OpenRouter & Hugging Face**: Sebagai penyedia cadangan.
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+---
 
-# Step 3: Install the necessary dependencies.
-npm i
+## 🚀 Cara Menjalankan Project
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+### Prasyarat
+- Node.js (versi 18 atau terbaru)
+- Akun Firebase (untuk database dan auth)
+- API Keys untuk Groq/Gemini (jika ingin menjalankan proxy sendiri)
 
-**Edit a file directly in GitHub**
+### Instalasi
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. Clone repository:
+   ```bash
+   git clone https://github.com/Syacretary/course-module.git
+   cd course-module
+   ```
 
-**Use GitHub Codespaces**
+2. Install dependensi:
+   ```bash
+   npm install
+   ```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+3. Konfigurasi Environment Variables:
+   Buat file `.env` di root folder dan isi dengan konfigurasi Firebase serta API Keys Anda (lihat `src/lib/firebase.ts` untuk referensi key).
 
-## What technologies are used for this project?
+4. Jalankan server pengembangan:
+   ```bash
+   # Terminal 1: Menjalankan Proxy Server (Opsional untuk lokal)
+   npm run server
 
-This project is built with:
+   # Terminal 2: Menjalankan Frontend
+   npm run dev
+   ```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+---
 
-## How can I deploy this project?
+## 📄 Lisensi
+Project ini dibuat untuk tujuan edukasi dan pengembangan personal.
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
-# api-kurikura
+---
+*Dibuat dengan ❤️ oleh [Syacretary](https://github.com/Syacretary)*
