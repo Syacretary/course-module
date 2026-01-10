@@ -22,11 +22,17 @@ export interface SubMaterial {
   content: string; // Markdown content
 }
 
+export interface Module {
+  id: string;
+  title: string;
+  subMaterials: SubMaterial[];
+}
+
 export interface Chapter {
   id: string;
   number: number;
   title: string;
-  subMaterials: SubMaterial[];
+  modules: Module[];
 }
 
 export interface Course {
@@ -36,7 +42,7 @@ export interface Course {
   description: string;
   topics: string[];
   chapters: Chapter[];
-  createdAt: Date;
+  createdAt: any;
   isFavorite?: boolean;
   isDeleted?: boolean; // Soft delete flag
 }

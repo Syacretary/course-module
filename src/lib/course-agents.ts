@@ -134,86 +134,79 @@ Total bab: 8-12 bab. Gunakan bahasa Indonesia yang approachable dan menimbulkan 
   return parsed.chapters;
 }
 
-// Agent 4: Generate sub-materials for a chapter based on micro-learning principles
-export async function generateSubMaterialTitles(
+import { Chapter, SubMaterial, Module } from "@/types/course";
+import { performQualityCheck } from "./qa-agent";
+import { synthesizeResearch } from "./research-agents";
+
+// Agent 4: Generate modules for a chapter
+export async function generateModules(
   chapterTitle: string,
   chapterNumber: number,
-  topics: string[],
-  totalChapters: number
+  topics: string[]
 ): Promise<Array<{ id: string; title: string }>> {
-  const systemPrompt = `Anda adalah seorang instructional designer dengan spesialisasi dalam micro-learning dan chunking strategies. Tugas Anda adalah menyusun 6 submateri (subtopik) dalam sebuah bab.
-
-### PRINSIP PENYUSUNAN SUBMATERI:
-
-1. **CHUNKING PRINCIPLE**: Maksimal 6 submateri. Setiap submateri adalah satu "unit pemikiran" yang lengkap.
-2. **FLOW STATE ARCHITECTURE**: 
-   - Sub 1: Hook & Foundation.
-   - Sub 2-3: Core Concepts.
-   - Sub 4-5: Application & Deepening.
-   - Sub 6: Integration & Bridge (jembatan ke bab berikutnya).
-3. **COGNITIVE SEQUENCING**: Ikuti pola What → Why → How → Practice → Mastery.
-4. **ACTIVE LEARNING**: Campurkan teori dengan submateri yang meminta refleksi atau eksperimen.
-
-### FORMAT OUTPUT JSON:
-Anda WAJIB memberikan output JSON valid dengan skema:
-{
-  "subMaterials": [
-    { 
-      "id": "ch${chapterNumber}-sub1", 
-      "title": "Judul Actionable - [Metode: Konseptual/Praktis/dll] ([Durasi] min)" 
-    }
-  ]
-}
-
-Total submateri: HARUS 6. Gunakan bahasa Indonesia yang clear dan tidak mengintimidasi.`;
-
-  const userPrompt = `Bab: ${chapterTitle}\nTopik: ${topics.join(", ")}\nBab ini adalah bab ke-${chapterNumber} dari total ${totalChapters} bab.`;
+  const systemPrompt = `Anda adalah seorang curriculum architect. Tugas Anda adalah membagi sebuah bab menjadi 2-3 modul logis.
+  
+  FORMAT OUTPUT JSON:
+  {
+    "modules": [
+      { "id": "ch${chapterNumber}-m1", "title": "Judul Modul" }
+    ]
+  }`;
 
   const response = await callGroq([
     { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt }
+    { role: "user", content: `Bab: ${chapterTitle}\nTopik: ${topics.join(", ")}` }
+  ], GROQ_MODELS.FAST, 0.6);
+
+  const parsed = parseJSON<{ modules: Array<{ id: string; title: string }> }>(response);
+  return parsed.modules || [];
+}
+
+// Agent 5: Generate sub-material titles for a module
+export async function generateSubMaterialTitles(
+  moduleTitle: string,
+  moduleId: string,
+  topics: string[]
+): Promise<Array<{ id: string; title: string }>> {
+  const systemPrompt = `Anda adalah seorang instructional designer. Bagi modul ini menjadi 2 submateri (unit belajar kecil).
+  
+  FORMAT OUTPUT JSON:
+  {
+    "subMaterials": [
+      { "id": "${moduleId}-s1", "title": "Judul Submateri" }
+    ]
+  }`;
+
+  const response = await callGroq([
+    { role: "system", content: systemPrompt },
+    { role: "user", content: `Modul: ${moduleTitle}\nTopik: ${topics.join(", ")}` }
   ], GROQ_MODELS.FAST, 0.6);
 
   const parsed = parseJSON<{ subMaterials: Array<{ id: string; title: string }> }>(response);
-  return parsed.subMaterials;
+  return parsed.subMaterials || [];
 }
 
-// Agent 5: Generate content for a sub-material using Educator Master principles
+// Agent 6: Generate content for a sub-material using Educator Master principles
 export async function generateSubMaterialContent(
   subMaterialTitle: string,
-  chapterTitle: string,
+  moduleTitle: string,
   topics: string[],
-  subMaterialIndex: number
+  researchContext: string
 ): Promise<string> {
-  const systemPrompt = `Anda adalah seorang educator master dengan kemampuan menjelaskan konsep kompleks dengan cara yang engaging, accessible, dan memorable. Tugas Anda adalah mengisi konten lengkap untuk setiap submateri.
-
-### PRINSIP PENYUSUNAN MATERI:
-
-1. **CONVERSATIONAL TONE**: Tulis seperti mentor, gunakan "Anda/kamu", pertanyaan retoris, dan analogi relatable.
-2. **DUAL CODING & ELABORATIVE ENCODING**: Gunakan analogi konkret untuk konsep abstrak. Jelaskan WHY dan HOW.
-3. **ACTIVE LEARNING**: Sisipkan "Coba Sekarang", "Pertanyaan Refleksi", atau "Quick Challenge".
-4. **FUSION LEARNING**: Untuk multiple topik, tunjukkan bagaimana topik-topik saling memperkuat secara natural.
+  const systemPrompt = `Anda adalah seorang educator master. Tulis konten edukasi yang mendalam, engaging, dan akurat.
+  Gunakan Markdown. Gunakan konteks riset berikut jika tersedia:
+  ${researchContext}
 
 ### STRUKTUR KONTEN WAJIB:
-- **HOOK** (100-150 kata): Grab attention.
-- **CORE CONTENT** (800-1200 kata): Breakdown konsep secara mendalam & step-by-step.
-- **PRACTICAL APPLICATION**: Actionable steps atau mini-project.
+- **HOOK**: Grab attention.
+- **CORE CONTENT**: Breakdown konsep secara mendalam.
+- **PRACTICAL APPLICATION**: Actionable steps.
 - **KEY TAKEAWAYS**: Bullet points ringkasan materi.
-- **BRIDGE**: Teaser untuk submateri selanjutnya.
-
-Gunakan format Markdown lengkap dengan subheadings, bold untuk penekanan, dan code blocks yang terdokumentasi dengan baik.`;
-
-  const userPrompt = `
-Judul Submateri: ${subMaterialTitle}
-Bagian dari Bab: ${chapterTitle}
-Urutan: Submateri ke-${subMaterialIndex + 1}
-Topik Utama: ${topics.join(", ")}
-
-Mulailah langsung dengan konten Markdown sesuai struktur yang diminta.`;
+- **BRIDGE**: Teaser selanjutnya.`;
 
   const response = await callGroq([
     { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt }
+    { role: "user", content: `Submateri: ${subMaterialTitle}\nModul: ${moduleTitle}\nTopik: ${topics.join(", ")}` }
   ], GROQ_MODELS.POWERFUL, 0.7);
 
   return response;
@@ -224,69 +217,88 @@ export async function generateFullCourse(
   topics: string[],
   answers: Array<{ question: string; answer: string }>,
   onProgress: (phase: string, current: number, total: number) => void,
-  onChapterComplete?: (chapter: Chapter) => void
+  onChapterComplete?: (chapter: Chapter) => void,
+  syllabusPlan?: Array<{ number: number; title: string; description: string; topics?: string[] }>
 ): Promise<{ title: string; description: string; chapters: Chapter[] }> {
-  // Step 1: Generate chapter plan
-  onProgress("Menyusun struktur bab...", 0, 10); // Updated range for 8-12 chapters
-  const chapterPlan = await generateChapterPlan(topics, answers);
+  
+  onProgress("Menyiapkan materi...", 0, 100);
+  
+  // Use existing syllabus plan if provided, otherwise generate a new one
+  let chapterPlan: Array<{ number: number; title: string; description: string; topics?: string[] }>;
+  
+  if (syllabusPlan && syllabusPlan.length > 0) {
+    chapterPlan = syllabusPlan;
+  } else {
+    onProgress("Menyusun struktur kurikulum...", 0, 100);
+    chapterPlan = await generateChapterPlan(topics, answers);
+  }
+  
+  if (!chapterPlan || chapterPlan.length === 0) {
+    throw new Error("Gagal menyusun struktur kurikulum.");
+  }
+  
+  // Research key topics once to provide context
+  const researchContext = await synthesizeResearch(topics[0], true);
   
   const chapters: Chapter[] = [];
+  const totalChapters = chapterPlan.length;
   
-  // Step 2-N: Generate sub-materials for each chapter
-  for (let i = 0; i < chapterPlan.length; i++) {
-    const chapter = chapterPlan[i];
-    onProgress(`Menyusun Bab ${chapter.number}: ${chapter.title}`, i + 1, chapterPlan.length);
+  for (let i = 0; i < totalChapters; i++) {
+    const chapterPlanItem = chapterPlan[i];
+    const progressPercent = Math.round((i / totalChapters) * 100);
+    onProgress(`Bab ${i+1}: ${chapterPlanItem.title}`, progressPercent, 100);
     
-    // Get sub-material titles
-    const subMaterialTitles = await generateSubMaterialTitles(
-      chapter.title,
-      chapter.number,
-      topics,
-      chapterPlan.length
-    );
+    // Pass suggested topics from syllabus if available
+    const suggestedTopics = chapterPlanItem.topics ? chapterPlanItem.topics.join(", ") : topics.join(", ");
     
-    // Generate content for each sub-material
-    const subMaterials: SubMaterial[] = [];
-    for (let j = 0; j < subMaterialTitles.length; j++) {
-      const subTitle = subMaterialTitles[j];
+    const moduleTitles = await generateModules(chapterPlanItem.title, chapterPlanItem.number, [suggestedTopics]);
+    const modules: Module[] = [];
+    
+    // Process modules in parallel within the chapter with a small stagger
+    const modulePromises = moduleTitles.map(async (modTitle, modIdx) => {
+      // Stagger start of each module by 500ms
+      await new Promise(r => setTimeout(r, modIdx * 500));
       
-      // Add a delay to prevent rate limiting (TPM)
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      const subTitles = await generateSubMaterialTitles(modTitle.title, modTitle.id, [suggestedTopics]);
+      const subMaterials: SubMaterial[] = [];
+      
+      // We still process sub-materials sequentially within a module to avoid hitting rate limits too hard,
+      // but modules run in parallel.
+      for (const subT of subTitles) {
+        onProgress(`Menulis: ${subT.title}`, progressPercent, 100);
+        
+        let content = await generateSubMaterialContent(subT.title, modTitle.title, [suggestedTopics], researchContext);
+        const qaResult = await performQualityCheck(content, chapterPlanItem.title, subT.title, topics);
+        
+        if (qaResult.passed && qaResult.revisedContent) {
+          content = qaResult.revisedContent;
+        }
 
-      const content = await generateSubMaterialContent(
-        subTitle.title,
-        chapter.title,
-        topics,
-        j // Pass index
-      );
-      subMaterials.push({
-        id: subTitle.id,
-        title: subTitle.title,
-        content
-      });
-    }
+        subMaterials.push({ id: subT.id, title: subT.title, content });
+        // Small buffer between sub-materials within the same module
+        await new Promise(r => setTimeout(r, 800));
+      }
+      
+      return { id: modTitle.id, title: modTitle.title, subMaterials };
+    });
+
+    const completedModules = await Promise.all(modulePromises);
+    modules.push(...completedModules);
     
     const finalizedChapter: Chapter = {
-      id: `chapter-${chapter.number}`,
-      number: chapter.number,
-      title: chapter.title,
-      subMaterials
+      id: `chapter-${chapterPlanItem.number}`,
+      number: chapterPlanItem.number,
+      title: chapterPlanItem.title,
+      modules
     };
 
     chapters.push(finalizedChapter);
-    
-    if (onChapterComplete) {
-      onChapterComplete(finalizedChapter);
-    }
+    if (onChapterComplete) onChapterComplete(finalizedChapter);
   }
   
-  // Generate course title and description
-  const courseTitle = `Panduan Lengkap ${topics.join(" & ")}`;
-  const courseDescription = `Course komprehensif untuk mempelajari ${topics.join(", ")} dari dasar hingga mahir. Disesuaikan dengan kebutuhan dan level Anda.`;
-  
   return {
-    title: courseTitle,
-    description: courseDescription,
+    title: `Panduan Lengkap ${topics.join(" & ")}`,
+    description: `Course komprehensif tentang ${topics.join(", ")}.`,
     chapters
   };
 }

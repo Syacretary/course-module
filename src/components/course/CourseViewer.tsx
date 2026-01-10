@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Course } from "@/types/course";
+import { useState, useEffect, useRef } from "react";
+import { Course, Chapter, Module, SubMaterial } from "@/types/course";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { 
   ChevronLeft, ChevronRight, Menu, Copy, Check, 
   FileText, ChevronDown, Lock, Sparkles, MessageSquare, Map, List, ArrowRight,
-  Terminal, Code2
+  Terminal, Code2, Clock, Info
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -16,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneLight, vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { AITutor } from "./AITutor";
+import { TextSelectionMenu } from "../TextSelectionMenu";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -43,6 +44,8 @@ interface CourseViewerProps {
   course: Course;
   onNewCourse: () => void;
 }
+
+const UNLOCK_TIME = 180; // 3 minutes in seconds
 
 const CopyButton = ({ value }: { value: string }) => {
   const [copied, setCopied] = useState(false);
@@ -172,175 +175,171 @@ const MarkdownContent = ({ content }: { content?: string }) => (
 export function CourseViewer({ course, onNewCourse }: CourseViewerProps) {
   const navigate = useNavigate();
   const [selectedChapter, setSelectedChapter] = useState(0);
+  const [selectedModule, setSelectedModule] = useState(0);
   const [selectedSubMaterial, setSelectedSubMaterial] = useState(0);
+  const [aiInput, setAiInput] = useState("");
   
-  // Progress Calculation
-  const totalSubMaterials = course.chapters.reduce((acc, ch) => acc + ch.subMaterials.length, 0);
-  const currentProgress = ((selectedChapter * 6 + selectedSubMaterial + 1) / totalSubMaterials) * 100;
+  // Timer & Unlocking State
+  const [timeLeft, setTimeLeft] = useState(UNLOCK_TIME);
+  const [unlockedProgress, setUnlockedProgress] = useState<{ chapter: number; module: number; sub: number }>(() => {
+    const saved = localStorage.getItem(`course_progress_${course.id}`);
+    return saved ? JSON.parse(saved) : { chapter: 0, module: 0, sub: 0 };
+  });
 
   const currentChapter = course.chapters[selectedChapter];
-  const currentSubMaterial = currentChapter?.subMaterials[selectedSubMaterial];
+  const currentModule = currentChapter?.modules?.[selectedModule];
+  const currentSubMaterial = currentChapter?.modules 
+    ? currentModule?.subMaterials?.[selectedSubMaterial]
+    : (currentChapter as any)?.subMaterials?.[selectedSubMaterial];
 
-  // Auto-scroll to top on change
+  // Hierarchy Navigation Helpers
+  const getNextIndices = (c: number, m: number, s: number) => {
+    const chap = course.chapters[c];
+    if (!chap) return null;
+
+    if (chap.modules && Array.isArray(chap.modules)) {
+      const mod = chap.modules[m];
+      if (s < (mod?.subMaterials?.length || 0) - 1) return { c, m, s: s + 1 };
+      if (m < chap.modules.length - 1) return { c, m: m + 1, s: 0 };
+    } else {
+      const subMaterials = (chap as any).subMaterials;
+      if (s < (subMaterials?.length || 0) - 1) return { c, m, s: s + 1 };
+    }
+
+    if (c < course.chapters.length - 1) return { c: c + 1, m: 0, s: 0 };
+    return null;
+  };
+
+  const getPrevIndices = (c: number, m: number, s: number) => {
+    if (s > 0) return { c, m, s: s - 1 };
+    
+    const chap = course.chapters[c];
+    if (chap && chap.modules && Array.isArray(chap.modules)) {
+      if (m > 0) {
+        const prevMod = chap.modules[m - 1];
+        return { c, m: m - 1, s: (prevMod?.subMaterials?.length || 1) - 1 };
+      }
+    }
+
+    if (c > 0) {
+      const prevChap = course.chapters[c - 1];
+      if (prevChap.modules && Array.isArray(prevChap.modules)) {
+        const lastModIdx = prevChap.modules.length - 1;
+        const lastMod = prevChap.modules[lastModIdx];
+        return { c: c - 1, m: lastModIdx, s: (lastMod?.subMaterials?.length || 1) - 1 };
+      } else {
+        const prevSubMaterials = (prevChap as any).subMaterials;
+        return { c: c - 1, m: 0, s: (prevSubMaterials?.length || 1) - 1 };
+      }
+    }
+    return null;
+  };
+
+  // Timer Logic
   useEffect(() => {
-    const viewports = document.querySelectorAll('[data-radix-scroll-area-viewport]');
-    viewports.forEach(v => v.scrollTo({ top: 0, behavior: 'smooth' }));
+    const next = getNextIndices(selectedChapter, selectedModule, selectedSubMaterial);
+    if (!next) {
+      setTimeLeft(0);
+      return;
+    }
+
+    // If next is already unlocked, timer is 0
+    const isNextUnlocked = 
+      next.c < unlockedProgress.chapter || 
+      (next.c === unlockedProgress.chapter && next.m < unlockedProgress.module) ||
+      (next.c === unlockedProgress.chapter && next.m === unlockedProgress.module && next.s <= unlockedProgress.sub);
+
+    if (isNextUnlocked) {
+      setTimeLeft(0);
+      return;
+    }
+
+    // Persistent Timer: check if we have a saved end time for THIS specific sub-material
+    const timerKey = `timer_${course.id}_${selectedChapter}_${selectedModule}_${selectedSubMaterial}`;
+    const savedEndTime = localStorage.getItem(timerKey);
+    let endTime: number;
+
+    if (savedEndTime) {
+      endTime = parseInt(savedEndTime);
+    } else {
+      endTime = Date.now() + UNLOCK_TIME * 1000;
+      localStorage.setItem(timerKey, endTime.toString());
+    }
+
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+      setTimeLeft(remaining);
+
+      if (remaining === 0) {
+        const newProgress = { chapter: next.c, module: next.m, sub: next.s };
+        setUnlockedProgress(newProgress);
+        localStorage.setItem(`course_progress_${course.id}`, JSON.stringify(newProgress));
+        clearInterval(interval);
+        toast.success("Materi berikutnya telah terbuka!");
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [selectedChapter, selectedModule, selectedSubMaterial, unlockedProgress, course.id]);
+
+  // Progress Calculation (Approximate)
+  const totalSubMaterials = (course.chapters || []).reduce((acc, ch) => {
+    if (ch && ch.modules && Array.isArray(ch.modules)) {
+      return acc + ch.modules.reduce((mAcc, m) => mAcc + (m?.subMaterials?.length || 0), 0);
+    }
+    // Fallback for old structure or missing modules
+    return acc + ((ch as any)?.subMaterials?.length || 0);
+  }, 0);
+  
+  const getCurrentFlatIndex = (c: number, m: number, s: number) => {
+    let index = 0;
+    for (let i = 0; i < c; i++) {
+      const chap = course.chapters[i];
+      if (chap) {
+        if (chap.modules && Array.isArray(chap.modules)) {
+          for (let j = 0; j < chap.modules.length; j++) {
+            index += chap.modules[j]?.subMaterials?.length || 0;
+          }
+        } else {
+          index += (chap as any).subMaterials?.length || 0;
+        }
+      }
+    }
+    const currentChap = course.chapters[c];
+    if (currentChap && currentChap.modules && Array.isArray(currentChap.modules)) {
+      for (let j = 0; j < m; j++) {
+        index += currentChap.modules[j]?.subMaterials?.length || 0;
+      }
+    }
+    return index + s + 1;
+  };
+
+  const currentProgress = (getCurrentFlatIndex(selectedChapter, selectedModule, selectedSubMaterial) / totalSubMaterials) * 100;
+
+  useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [selectedChapter, selectedSubMaterial]);
+  }, [selectedChapter, selectedModule, selectedSubMaterial]);
 
-  const navigateNext = () => {
-    if (selectedSubMaterial < currentChapter.subMaterials.length - 1) {
-      setSelectedSubMaterial(prev => prev + 1);
-    } else if (selectedChapter < course.chapters.length - 1) {
-      setSelectedChapter(prev => prev + 1);
-      setSelectedSubMaterial(0);
-    }
+  const nextIndices = getNextIndices(selectedChapter, selectedModule, selectedSubMaterial);
+  const prevIndices = getPrevIndices(selectedChapter, selectedModule, selectedSubMaterial);
+  
+  const isNextLocked = nextIndices && (
+    nextIndices.c > unlockedProgress.chapter || 
+    (nextIndices.c === unlockedProgress.chapter && nextIndices.m > unlockedProgress.module) ||
+    (nextIndices.c === unlockedProgress.chapter && nextIndices.m === unlockedProgress.module && nextIndices.s > unlockedProgress.sub)
+  );
+
+  const handleAskAI = (text: string) => {
+    setAiInput(`Aku nggak paham dengan "${text}", Bisa jelasin kaya anak kecil nggak?`);
   };
-
-  const navigatePrev = () => {
-    if (selectedSubMaterial > 0) {
-      setSelectedSubMaterial(prev => prev - 1);
-    } else if (selectedChapter > 0) {
-      setSelectedChapter(prev => prev - 1);
-      const prevChapter = course.chapters[selectedChapter - 1];
-      setSelectedSubMaterial(prevChapter.subMaterials.length - 1);
-    }
-  };
-
-  const hasNext = selectedSubMaterial < currentChapter?.subMaterials.length - 1 || selectedChapter < course.chapters.length - 1;
-  const hasPrev = selectedSubMaterial > 0 || selectedChapter > 0;
-
-  // Swipe Handlers for Mobile
-  const swipeHandlers = useSwipeable({
-    onSwipedLeft: () => hasNext && navigateNext(),
-    onSwipedRight: () => hasPrev && navigatePrev(),
-    preventScrollOnSwipe: false, // Allow vertical scrolling
-    trackMouse: false
-  });
 
   return (
     <div className="h-full bg-background relative overflow-hidden flex flex-col md:flex-row">
-      
-      {/* ================= MOBILE VIEW (Content First + Bottom Dock) ================= */}
-      <div className="md:hidden flex-1 flex flex-col h-full relative" {...swipeHandlers}>
-        
-        {/* Minimal Top Bar */}
-        <div className="h-14 px-4 flex items-center justify-between border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-30">
-           <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="-ml-2">
-             <ChevronLeft className="w-5 h-5" />
-           </Button>
-           <span className="text-sm font-bold truncate max-w-[200px]">{currentChapter?.title}</span>
-           <div className="w-8" /> {/* Spacer */}
-        </div>
+      <TextSelectionMenu onAskAI={handleAskAI} />
 
-        {/* Main Canvas (Full Screen Scroll) */}
-        <ScrollArea className="flex-1 w-full pb-24"> 
-          <article className="px-5 py-6">
-             <div className="mb-6">
-                <span className="text-[10px] font-black uppercase tracking-widest text-primary/80 bg-primary/10 px-2 py-1 rounded">
-                  Bagian {selectedSubMaterial + 1}
-                </span>
-                <h1 className="text-2xl font-display font-black leading-tight mt-3">
-                  {currentSubMaterial?.title}
-                </h1>
-             </div>
-             <MarkdownContent content={currentSubMaterial?.content} />
-             
-             {/* End of Chapter Hint */}
-             <div className="mt-12 pt-8 border-t border-dashed border-border text-center text-xs text-muted-foreground">
-                {hasNext ? "Geser kiri untuk lanjut →" : "Bab Selesai! 🎉"}
-             </div>
-          </article>
-        </ScrollArea>
-
-        {/* Floating Glass Dock */}
-        <div className="absolute bottom-6 left-4 right-4 h-16 rounded-2xl bg-black/80 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center justify-between px-6 z-40 text-white">
-           
-           {/* Left: Map/Syllabus */}
-           <Sheet>
-             <SheetTrigger asChild>
-               <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl">
-                 <Map className="w-6 h-6" />
-               </Button>
-             </SheetTrigger>
-             <SheetContent side="left" className="w-[85%] sm:w-[380px] p-0">
-                <SheetHeader className="p-6 bg-secondary/10 border-b text-left space-y-1">
-                   <SheetTitle className="font-display font-bold text-xl">Peta Belajar</SheetTitle>
-                   <SheetDescription className="text-xs text-muted-foreground">
-                      Telusuri seluruh modul dan pantau progres belajarmu.
-                   </SheetDescription>
-                   <Progress value={currentProgress} className="h-2 mt-3" />
-                   <p className="text-[10px] text-muted-foreground mt-1 text-right">{Math.round(currentProgress)}% Selesai</p>
-                </SheetHeader>
-                <ScrollArea className="h-[calc(100vh-160px)]">
-                   <div className="p-4 space-y-4">
-                      {course.chapters.map((chap, idx) => (
-                        <div key={chap.id} className={cn("space-y-2", idx === selectedChapter ? "opacity-100" : "opacity-60")}>
-                           <div className="font-bold text-sm flex items-center gap-2">
-                              <span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs border", idx === selectedChapter ? "bg-primary text-white border-primary" : "border-border")}>
-                                {idx + 1}
-                              </span>
-                              {chap.title}
-                           </div>
-                           {/* Sub Materials List */}
-                           <div className="pl-8 space-y-1">
-                             {chap.subMaterials.map((sub, sIdx) => (
-                               <button 
-                                 key={sub.id}
-                                 onClick={() => { setSelectedChapter(idx); setSelectedSubMaterial(sIdx); }}
-                                 className={cn("block text-xs text-left w-full py-1.5 px-2 rounded", 
-                                   idx === selectedChapter && sIdx === selectedSubMaterial ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground"
-                                 )}
-                               >
-                                 {sub.title}
-                               </button>
-                             ))}
-                           </div>
-                        </div>
-                      ))}
-                   </div>
-                </ScrollArea>
-             </SheetContent>
-           </Sheet>
-
-           {/* Middle: Progress Indicator (Text) */}
-           <div className="flex flex-col items-center">
-              <span className="text-[10px] font-mono text-white/50 uppercase tracking-widest">PROGRESS</span>
-              <span className="text-sm font-bold text-white">{Math.round(currentProgress)}%</span>
-           </div>
-
-           {/* Right: AI Tutor (Drawer) */}
-           <Drawer>
-             <DrawerTrigger asChild>
-               <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10 rounded-xl relative">
-                 <Sparkles className="w-6 h-6" />
-                 <span className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-               </Button>
-             </DrawerTrigger>
-             <DrawerContent className="h-[85vh] flex flex-col fixed bottom-0 left-0 right-0 rounded-t-[20px] outline-none">
-                <DrawerHeader className="border-b border-border/50 text-left">
-                   <DrawerTitle className="flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-primary" />
-                      AI Tutor
-                   </DrawerTitle>
-                   <DrawerDescription className="hidden">
-                      Tanya apapun tentang materi yang sedang kamu pelajari.
-                   </DrawerDescription>
-                </DrawerHeader>
-                <div className="flex-1 overflow-hidden bg-background">
-                   <AITutor currentContext={currentSubMaterial?.content || ""} />
-                </div>
-             </DrawerContent>
-           </Drawer>
-
-        </div>
-      </div>
-
-
-      {/* ================= DESKTOP VIEW (Classic 3-Pane) ================= */}
+      {/* ================= DESKTOP VIEW ================= */}
       <div className="hidden md:flex flex-1 h-full overflow-hidden">
-        {/* Left Side: Navigation */}
-        <aside className="w-72 bg-card border-r border-border flex flex-col shrink-0">
+        <aside className="w-80 bg-card border-r border-border flex flex-col shrink-0">
           <div className="p-4 border-b border-border">
             <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground" onClick={() => navigate("/")}>
               <ChevronLeft className="w-4 h-4 mr-1" /> Dashboard
@@ -348,80 +347,129 @@ export function CourseViewer({ course, onNewCourse }: CourseViewerProps) {
             <h2 className="font-display font-bold text-lg leading-tight line-clamp-2">{course.title}</h2>
           </div>
           <ScrollArea className="flex-1">
-            <div className="p-3 space-y-1">
-              {course.chapters.map((chapter, idx) => {
-                const isLocked = idx > selectedChapter + 1; 
-                return (
-                  <div key={chapter.id} className="space-y-1">
-                    <button
-                      onClick={() => !isLocked && setSelectedChapter(idx)}
-                      disabled={isLocked}
-                      className={cn(
-                        "w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group",
-                        selectedChapter === idx ? "bg-primary/10 text-primary" : "hover:bg-secondary/50 text-foreground/80",
-                        isLocked && "opacity-50 cursor-not-allowed"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-6 h-6 rounded flex items-center justify-center text-xs font-bold shrink-0 border transition-colors",
-                        selectedChapter === idx ? "border-primary bg-primary text-white" : "border-border bg-background"
-                      )}>
-                        {isLocked ? <Lock className="w-3 h-3" /> : idx + 1}
-                      </div>
-                      <span className="text-sm font-medium truncate flex-1">Minggu {idx + 1}</span>
-                      {selectedChapter === idx && <ChevronDown className="w-4 h-4 opacity-50" />}
-                    </button>
-                    {selectedChapter === idx && !isLocked && (
-                      <div className="ml-3 pl-3 border-l-2 border-primary/10 space-y-0.5 py-1">
-                        {chapter.subMaterials.map((sub, subIdx) => (
-                          <button
-                            key={sub.id}
-                            onClick={() => setSelectedSubMaterial(subIdx)}
-                            className={cn(
-                              "w-full text-left flex items-start gap-2 px-3 py-2 rounded-md text-xs transition-colors",
-                              selectedSubMaterial === subIdx 
-                                ? "text-primary font-bold bg-primary/5" 
-                                : "text-muted-foreground hover:text-foreground"
-                            )}
-                          >
-                            <FileText className="w-3 h-3 mt-0.5 shrink-0" />
-                            <span className="line-clamp-2">{sub.title}</span>
-                          </button>
-                        ))}
+            <div className="p-3 space-y-4">
+              {course.chapters.map((chap, cIdx) => (
+                <div key={chap.id} className="space-y-1">
+                  <div className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center justify-between">
+                    <span>BAB {cIdx + 1}</span>
+                    {cIdx > unlockedProgress.chapter && <Lock className="w-3 h-3" />}
+                  </div>
+                  <div className="space-y-1">
+                    {chap.modules && Array.isArray(chap.modules) ? (
+                      chap.modules.map((mod, mIdx) => (
+                        <div key={mod.id} className="space-y-0.5">
+                          <div className="px-3 py-1.5 text-xs font-bold text-foreground/80 flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+                            {mod.title}
+                          </div>
+                          <div className="ml-4 border-l border-border/50 pl-2">
+                            {mod.subMaterials.map((sub, sIdx) => {
+                              const isLocked = 
+                                cIdx > unlockedProgress.chapter || 
+                                (cIdx === unlockedProgress.chapter && mIdx > unlockedProgress.module) ||
+                                (cIdx === unlockedProgress.chapter && mIdx === unlockedProgress.module && sIdx > unlockedProgress.sub);
+                              
+                              const isActive = selectedChapter === cIdx && selectedModule === mIdx && selectedSubMaterial === sIdx;
+
+                              return (
+                                <button
+                                  key={sub.id}
+                                  disabled={isLocked}
+                                  onClick={() => {
+                                    setSelectedChapter(cIdx);
+                                    setSelectedModule(mIdx);
+                                    setSelectedSubMaterial(sIdx);
+                                  }}
+                                  className={cn(
+                                    "w-full text-left flex items-start gap-2 px-3 py-1.5 rounded-md text-[11px] transition-all",
+                                    isActive ? "bg-primary/10 text-primary font-bold" : "text-muted-foreground hover:text-foreground",
+                                    isLocked && "opacity-40 cursor-not-allowed"
+                                  )}
+                                >
+                                  {isLocked ? <Lock className="w-3 h-3 mt-0.5 shrink-0" /> : <FileText className="w-3 h-3 mt-0.5 shrink-0" />}
+                                  <span className="line-clamp-1">{sub.title}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="ml-4 border-l border-border/50 pl-2">
+                        {(chap as any).subMaterials?.map((sub: any, sIdx: number) => {
+                          const isLocked = 
+                            cIdx > unlockedProgress.chapter || 
+                            (cIdx === unlockedProgress.chapter && sIdx > unlockedProgress.sub);
+                          
+                          const isActive = selectedChapter === cIdx && selectedSubMaterial === sIdx;
+
+                          return (
+                            <button
+                              key={sub.id}
+                              disabled={isLocked}
+                              onClick={() => {
+                                setSelectedChapter(cIdx);
+                                setSelectedSubMaterial(sIdx);
+                              }}
+                              className={cn(
+                                "w-full text-left flex items-start gap-2 px-3 py-1.5 rounded-md text-[11px] transition-all",
+                                isActive ? "bg-primary/10 text-primary font-bold" : "text-muted-foreground hover:text-foreground",
+                                isLocked && "opacity-40 cursor-not-allowed"
+                              )}
+                            >
+                              {isLocked ? <Lock className="w-3 h-3 mt-0.5 shrink-0" /> : <FileText className="w-3 h-3 mt-0.5 shrink-0" />}
+                              <span className="line-clamp-1">{sub.title}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </ScrollArea>
         </aside>
 
-        {/* Resizable Panels for Content + Chat */}
         <div className="flex-1 min-w-0 relative flex flex-col h-full overflow-hidden">
           <ResizablePanelGroup direction="horizontal">
-            {/* Main Content Panel */}
-            <ResizablePanel defaultSize={75} minSize={50} className="flex flex-col bg-background relative">
-              <ScrollArea className="flex-1 w-full">
-                <article className="max-w-3xl mx-auto px-6 py-12 w-full">
-                  <div className="mb-8 space-y-4">
-                    <div className="flex items-center gap-2 text-xs font-mono text-primary uppercase tracking-widest">
-                      <span className="px-2 py-1 rounded bg-primary/10">Minggu {selectedChapter + 1}</span>
-                      <ChevronRight className="w-3 h-3 text-muted-foreground" />
-                      <span>Modul {selectedSubMaterial + 1}</span>
+            <ResizablePanel defaultSize={70} className="flex flex-col bg-background relative">
+              <ScrollArea className="flex-1 w-full" id="main-content-area">
+                <article className="max-w-3xl mx-auto px-10 py-12 w-full">
+                  <div className="mb-10 space-y-4">
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-primary uppercase tracking-widest">
+                      <span>Bab {selectedChapter + 1}</span>
+                      <ChevronRight className="w-3 h-3 text-muted-foreground/40" />
+                      <span>{currentModule?.title || "Materi"}</span>
                     </div>
-                    <h1 className="text-3xl md:text-4xl font-display font-black tracking-tight leading-tight text-balance">
+                    <h1 className="text-4xl font-display font-black tracking-tight leading-tight">
                       {currentSubMaterial?.title}
                     </h1>
                   </div>
+                  
                   <MarkdownContent content={currentSubMaterial?.content} />
-                  <div className="flex items-center justify-between mt-16 pt-8 border-t border-border">
-                    <Button variant="ghost" onClick={navigatePrev} disabled={!hasPrev}>
-                      <ChevronLeft className="w-4 h-4 mr-2" /> Sebelumnya
+
+                  <div className="flex items-center justify-between mt-20 pt-10 border-t border-border">
+                    <Button variant="ghost" onClick={() => prevIndices && (setSelectedChapter(prevIndices.c), setSelectedModule(prevIndices.m), setSelectedSubMaterial(prevIndices.s))} disabled={!prevIndices}>
+                      <ChevronLeft className="w-4 h-4 mr-2" /> Kembali
                     </Button>
-                    <Button onClick={navigateNext} disabled={!hasNext} className="px-8 shadow-lg bg-primary hover:bg-primary/90">
-                      Selanjutnya <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
+                    
+                    <div className="flex items-center gap-4">
+                      {timeLeft > 0 && (
+                        <div className="flex items-center gap-2 px-4 py-2 bg-secondary rounded-full text-xs font-mono font-bold min-w-[120px] justify-center">
+                          <Clock className="w-3 h-3 text-primary animate-pulse" />
+                          {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                        </div>
+                      )}
+                      <Button 
+                        disabled={isNextLocked || !nextIndices}
+                        onClick={() => nextIndices && (setSelectedChapter(nextIndices.c), setSelectedModule(nextIndices.m), setSelectedSubMaterial(nextIndices.s))}
+                        className="px-10 h-11 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                      >
+                        {isNextLocked ? "Terkunci" : "Lanjut"}
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Button>
+                    </div>
                   </div>
                 </article>
               </ScrollArea>
@@ -429,23 +477,150 @@ export function CourseViewer({ course, onNewCourse }: CourseViewerProps) {
 
             <ResizableHandle withHandle />
 
-            {/* Chat Sidebar Panel */}
-            <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="flex flex-col border-l border-border bg-card">
+            <ResizablePanel defaultSize={30} className="flex flex-col border-l border-border bg-card">
               <div className="p-6 border-b border-border bg-secondary/5 shrink-0">
                 <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground">Progress</h3>
+                  <h3 className="font-bold text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Mastery Progress</h3>
                   <span className="text-xs font-mono font-bold text-primary">{Math.round(currentProgress)}%</span>
                 </div>
-                <Progress value={currentProgress} className="h-2" />
+                <Progress value={currentProgress} className="h-1.5" />
               </div>
               <div className="flex-1 overflow-hidden">
-                <AITutor currentContext={currentSubMaterial?.content || ""} />
+                <AITutor currentContext={currentSubMaterial?.content || ""} externalInput={aiInput} onInputChange={setAiInput} />
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>
       </div>
 
+      {/* ================= MOBILE VIEW (REDACTED FOR BREVITY, WOULD BE UPDATED SIMILARLY) ================= */}
+      <div className="md:hidden flex-1 flex flex-col h-full bg-background" {...useSwipeable({
+        onSwipedLeft: () => !isNextLocked && nextIndices && (setSelectedChapter(nextIndices.c), setSelectedModule(nextIndices.m), setSelectedSubMaterial(nextIndices.s)),
+        onSwipedRight: () => prevIndices && (setSelectedChapter(prevIndices.c), setSelectedModule(prevIndices.m), setSelectedSubMaterial(prevIndices.s)),
+      })}>
+         <div className="h-14 px-4 flex items-center justify-between border-b bg-background/80 backdrop-blur-xl sticky top-0 z-30">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/my-courses")}>
+              <ChevronLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex flex-col items-center max-w-[200px]">
+               <span className="text-[9px] font-black text-primary uppercase tracking-widest">BAB {selectedChapter + 1}</span>
+               <span className="text-xs font-bold truncate w-full text-center">{currentSubMaterial?.title}</span>
+            </div>
+            <div className="w-10" />
+         </div>
+
+         <ScrollArea className="flex-1" id="mobile-content-area">
+            <article className="px-6 py-8 pb-32">
+               <MarkdownContent content={currentSubMaterial?.content} />
+               
+               <div className="mt-12 space-y-4">
+                  {timeLeft > 0 && (
+                    <div className="flex items-center justify-center gap-2 p-4 bg-secondary/50 rounded-2xl border border-border">
+                       <Clock className="w-4 h-4 text-primary" />
+                       <span className="text-sm font-bold font-mono">Buka materi berikutnya dalam {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+                    </div>
+                  )}
+                  <Button 
+                    disabled={isNextLocked || !nextIndices}
+                    onClick={() => nextIndices && (setSelectedChapter(nextIndices.c), setSelectedModule(nextIndices.m), setSelectedSubMaterial(nextIndices.s))}
+                    className="w-full h-14 rounded-2xl text-lg font-bold shadow-2xl"
+                  >
+                    {isNextLocked ? "Terkunci (Baca Dulu)" : "Lanjut Belajar"}
+                  </Button>
+               </div>
+            </article>
+         </ScrollArea>
+
+         <div className="fixed bottom-6 left-4 right-4 h-16 rounded-2xl bg-black/90 backdrop-blur-2xl border border-white/10 shadow-2xl flex items-center justify-between px-6 z-40">
+            <Sheet>
+               <SheetTrigger asChild>
+                 <Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto">
+                    <Map className="w-6 h-6" />
+                 </Button>
+               </SheetTrigger>
+               <SheetContent side="left" className="w-[85%] p-0">
+                  {/* Updated Sitemap with 3-levels */}
+                  <ScrollArea className="h-full p-6">
+                    <h3 className="font-display font-black text-2xl mb-6">Peta Kurikura</h3>
+                    <div className="space-y-6">
+                       {course.chapters.map((chap, cIdx) => (
+                         <div key={chap.id} className="space-y-3">
+                            <div className="text-[10px] font-black text-primary tracking-widest uppercase">Bab {cIdx + 1}: {chap.title}</div>
+                            <div className="space-y-4 pl-2">
+                               {chap.modules && Array.isArray(chap.modules) ? (
+                                 chap.modules.map((mod, mIdx) => (
+                                   <div key={mod.id} className="space-y-1">
+                                      <div className="text-xs font-bold">{mod.title}</div>
+                                      <div className="space-y-0.5">
+                                         {mod.subMaterials.map((sub, sIdx) => {
+                                            const isLocked = 
+                                              cIdx > unlockedProgress.chapter || 
+                                              (cIdx === unlockedProgress.chapter && mIdx > unlockedProgress.module) ||
+                                              (cIdx === unlockedProgress.chapter && mIdx === unlockedProgress.module && sIdx > unlockedProgress.sub);
+                                            return (
+                                              <button 
+                                                key={sub.id}
+                                                disabled={isLocked}
+                                                onClick={() => { setSelectedChapter(cIdx); setSelectedModule(mIdx); setSelectedSubMaterial(sIdx); }}
+                                                className={cn("w-full text-left text-[11px] py-1 px-2 rounded", 
+                                                  selectedChapter === cIdx && selectedModule === mIdx && selectedSubMaterial === sIdx ? "bg-primary text-white" : "text-muted-foreground"
+                                                )}
+                                              >
+                                                {isLocked ? "🔒 " : "📄 "}{sub.title}
+                                              </button>
+                                            );
+                                         })}
+                                      </div>
+                                   </div>
+                                 ))
+                               ) : (
+                                  <div className="space-y-0.5">
+                                     {(chap as any).subMaterials?.map((sub: any, sIdx: number) => {
+                                        const isLocked = 
+                                          cIdx > unlockedProgress.chapter || 
+                                          (cIdx === unlockedProgress.chapter && sIdx > unlockedProgress.sub);
+                                        return (
+                                          <button 
+                                            key={sub.id}
+                                            disabled={isLocked}
+                                            onClick={() => { setSelectedChapter(cIdx); setSelectedSubMaterial(sIdx); }}
+                                            className={cn("w-full text-left text-[11px] py-1 px-2 rounded", 
+                                              selectedChapter === cIdx && selectedSubMaterial === sIdx ? "bg-primary text-white" : "text-muted-foreground"
+                                            )}
+                                          >
+                                            {isLocked ? "🔒 " : "📄 "}{sub.title}
+                                          </button>
+                                        );
+                                     })}
+                                  </div>
+                               )}
+                            </div>
+                         </div>
+                       ))}
+                    </div>
+                  </ScrollArea>
+               </SheetContent>
+            </Sheet>
+
+            <div className="flex flex-col items-center">
+               <span className="text-[8px] font-black text-white/40 tracking-[0.3em]">PROGRESS</span>
+               <span className="text-sm font-bold text-white">{Math.round(currentProgress)}%</span>
+            </div>
+
+            <Drawer>
+              <DrawerTrigger asChild>
+                <Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto relative">
+                   <Sparkles className="w-6 h-6" />
+                   <div className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full animate-pulse" />
+                </Button>
+              </DrawerTrigger>
+              <DrawerContent className="h-[80vh]">
+                 <AITutor currentContext={currentSubMaterial?.content || ""} externalInput={aiInput} onInputChange={setAiInput} />
+              </DrawerContent>
+            </Drawer>
+         </div>
+      </div>
     </div>
   );
 }
+

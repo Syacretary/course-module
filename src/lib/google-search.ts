@@ -1,6 +1,5 @@
-
-const GOOGLE_KEY = "AIzaSyBSY49ZrSKY7lRs9bX3V1Sd11jYuntScBw";
-const GOOGLE_CX = "40d5fbdf4db1945d9";
+const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_SEARCH_KEY || "";
+const GOOGLE_CX = import.meta.env.VITE_GOOGLE_CX || "";
 
 export interface SearchResult {
   title: string;
@@ -9,6 +8,11 @@ export interface SearchResult {
 }
 
 export async function searchGoogle(query: string): Promise<SearchResult[]> {
+  if (!GOOGLE_KEY || !GOOGLE_CX) {
+    console.warn("Google Search API Key or CX is missing. Search will be disabled.");
+    return [];
+  }
+  
   try {
     const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(query)}`;
     const response = await fetch(url);

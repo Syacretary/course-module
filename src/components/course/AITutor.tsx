@@ -10,12 +10,26 @@ import ReactMarkdown from "react-markdown";
 
 interface AITutorProps {
   currentContext: string;
+  externalInput?: string;
+  onInputChange?: (val: string) => void;
 }
 
-export function AITutor({ currentContext }: AITutorProps) {
+export function AITutor({ currentContext, externalInput = "", onInputChange }: AITutorProps) {
   const { messages, isTyping, sendMessage } = useTutorChat(currentContext);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Sync external input
+  useEffect(() => {
+    if (externalInput) {
+      setInput(externalInput);
+    }
+  }, [externalInput]);
+
+  const handleInputChange = (val: string) => {
+    setInput(val);
+    if (onInputChange) onInputChange(val);
+  };
 
   // Auto-scroll
   useEffect(() => {
@@ -32,7 +46,8 @@ export function AITutor({ currentContext }: AITutorProps) {
     if (!input.trim()) return;
     
     const text = input;
-    setInput(""); // Clear immediately
+    setInput(""); 
+    if (onInputChange) onInputChange(""); // Reset external
     await sendMessage(text, currentContext);
   };
 
@@ -108,7 +123,7 @@ export function AITutor({ currentContext }: AITutorProps) {
         <form onSubmit={handleSend} className="relative">
           <Input
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => handleInputChange(e.target.value)}
             placeholder="Tanya sesuatu..."
             className="pr-10 rounded-full bg-secondary/50 border-transparent focus:bg-background focus:border-primary/30 transition-all"
             disabled={isTyping}

@@ -57,15 +57,26 @@ export async function getRoadmapContent(topic: string): Promise<string | null> {
 
     if (!html || html.includes("404: Not Found")) return null;
 
-    // Simple HTML to Text stripper
-    let text = html.replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gm, "")
-                  .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gm, "");
-    
-    text = text.replace(/<[^>]+>/g, " "); 
+    // Use DOMParser for cleaner extraction
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+
+    // Remove noise
+    const noise = doc.querySelectorAll('script, style, nav, footer, header');
+    noise.forEach(n => n.remove());
+
+    // Focus on main content or headings and lists
+    const contentElements = doc.querySelectorAll('h1, h2, h3, h4, p, li');
+    let text = Array.from(contentElements)
+      .map(el => el.textContent?.trim())
+      .filter(t => t && t.length > 2)
+      .join(" ");
+
+    // Clean up whitespace
     text = text.replace(/\s+/g, " ").trim(); 
 
     // Return the first 4000 characters for context
-    return text.slice(0, 4000) + "...";
+    return text.slice(0, 4000) + (text.length > 4000 ? "..." : "");
 
   } catch (error) {
     console.warn("[Scraper] Failed to fetch roadmap context:", error);

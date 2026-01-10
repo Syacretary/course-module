@@ -66,13 +66,31 @@ export async function callGroq(
 }
 
 export function parseJSON<T>(content: string): T {
+  // Try to find JSON in markdown blocks first
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const jsonString = jsonMatch ? jsonMatch[1].trim() : content.trim();
+  let jsonString = jsonMatch ? jsonMatch[1].trim() : content.trim();
   
+  // If still not valid, try to find the first '{' and last '}'
+  if (!jsonString.startsWith('{') && !jsonString.startsWith('[')) {
+    const startIdx = content.indexOf('{');
+    const endIdx = content.lastIndexOf('}');
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      jsonString = content.slice(startIdx, endIdx + 1);
+    }
+  }
+
   try {
     return JSON.parse(jsonString);
   } catch (e) {
-    console.error("Failed to parse JSON:", content);
-    throw new Error("Failed to parse JSON response from AI");
+    console.error("Failed to parse JSON content:", content);
+    // Attempt one last desperate fix: remove any trailing commas or common AI hallucinations
+    try {
+      const cleaned = jsonString
+        .replace(/,\s*([\]}])/g, '$1') // remove trailing commas
+        .replace(/(\r\n|\n|\r)/gm, " "); // remove newlines
+      return JSON.parse(cleaned);
+    } catch (e2) {
+      throw new Error("Failed to parse JSON response from AI: " + (e2 as Error).message);
+    }
   }
 }

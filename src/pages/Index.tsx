@@ -16,13 +16,21 @@ export default function Index() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const placeholders = [
+    "AI Prompt Engineering untuk produktivitas...",
     "Public Speaking untuk introvert...",
+    "Dasar-dasar Blockchain & Web3...",
+    "Manajemen Waktu & Deep Work...",
     "Flutter Developer untuk pemula...",
-    "Konsep Mol Kimia untuk pelajar...",
+    "Cyber Security: Cara menjaga data pribadi...",
+    "Strategi Content Creator di 2026...",
+    "Emotional Intelligence di tempat kerja...",
     "Desain UI/UX dengan Figma...",
-    "Strategi Marketing TikTok 2025...",
-    "Rust Programming untuk Backend...",
-    "Machine Learning untuk Prediksi Harga..."
+    "Bahasa pemrograman Rust untuk backend...",
+    "Analisis Data dengan Python & SQL...",
+    "Critical Thinking dalam pengambilan keputusan...",
+    "Sustainable Living: Gaya hidup ramah lingkungan...",
+    "Copywriting yang menjual untuk UMKM...",
+    "Persiapan karir di industri AI..."
   ];
 
   const placeholderText = useTypewriter(placeholders);
@@ -39,7 +47,7 @@ export default function Index() {
     // Subtle focus animation for the container
     anime({
       targets: '.search-container',
-      scale: 1.02,
+      scale: 1.01,
       boxShadow: '0 20px 40px rgba(124, 58, 237, 0.1)',
       duration: 800,
       easing: 'easeOutExpo'
@@ -77,7 +85,7 @@ export default function Index() {
         </div>
 
         {/* Search Box Container */}
-        <div className="search-container w-full relative group transition-all duration-500">
+        <div className="search-container w-full relative group transition-all duration-500 rounded-full">
           <form onSubmit={handleSubmit} className="relative flex items-center">
             <div className="absolute left-6 text-muted-foreground/50">
               <Search className="w-6 h-6" />
@@ -90,7 +98,7 @@ export default function Index() {
               onFocus={handleFocus}
               onBlur={handleBlur}
               placeholder={placeholderText}
-              className="w-full h-20 sm:h-24 pl-16 pr-20 rounded-full text-xl sm:text-2xl border-2 border-border/50 bg-background/50 backdrop-blur-xl focus:border-primary/50 focus:ring-0 shadow-xl transition-all font-light placeholder:text-muted-foreground/30"
+              className="w-full h-20 sm:h-24 pl-16 pr-20 rounded-full text-base sm:text-2xl border-2 border-border/50 bg-background/50 backdrop-blur-xl focus:border-primary/50 focus:ring-0 shadow-xl transition-all font-light placeholder:text-muted-foreground/30"
             />
 
             <Button 

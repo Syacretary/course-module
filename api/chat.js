@@ -34,87 +34,77 @@ async function callOpenRouter(messages, model = "meta-llama/llama-3.1-405b-instr
 
 async function callGoogle(messages) {
   console.log(`[Vercel] Calling Google AI (Gemini 2.0)...`);
-  const prompt = messages.map(m => `${m.role === 'system' ? 'Instruction' : m.role}: ${m.content}`).join("\n\n");
-  const result = await googleModel.generateContent(prompt);
-  const response = await result.response;
-  return response.text();
+  
+  // Convert OpenAI messages to Gemini format
+  const history = messages.slice(0, -1).map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+  
+  const lastMessage = messages[messages.length - 1];
+  
+  // If there's a system message, we should ideally put it in systemInstruction, 
+  // but for simplicity here we'll prepend it if it's the first message.
+  const systemMessage = messages.find(m => m.role === 'system');
+  const userMessages = messages.filter(m => m.role !== 'system');
+  
+  const chat = googleModel.startChat({
+    history: userMessages.slice(0, -1).map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    })),
+    systemInstruction: systemMessage?.content,
+  });
+
+  const result = await chat.sendMessage(userMessages[userMessages.length - 1].content);
+  return result.response.text();
 }
 
-async function callGroq(messages, model = "llama-3.3-70b-versatile") {
-  console.log(`[Vercel] Calling Groq (${model})...`);
-  const completion = await groq.chat.completions.create({
-    model,
-    messages,
-    temperature: 0.7,
-  });
-  return completion.choices[0].message.content;
-}
-
-async function callHuggingFace(messages) {
-  console.log(`[Vercel] Calling Hugging Face (Llama-3-8B)...`);
-  const response = await hf.chatCompletion({
-    model: 'meta-llama/Meta-Llama-3-8B-Instruct',
-    messages,
-    max_tokens: 4000,
-    temperature: 0.7,
-  });
-  return response.choices[0].message.content;
+// Helper for fallback logic
+async function withFallback(providers) {
+  const errors = [];
+  for (const provider of providers) {
+    try {
+      return await provider();
+    } catch (err) {
+      console.warn(`Provider failed: ${err.message}`);
+      errors.push(err.message);
+    }
+  }
+  throw new Error(`All providers failed: ${errors.join(" | ")}`);
 }
 
 // Vercel Serverless Handler
 export default async function handler(req, res) {
-  // CORS Handling
-  res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { messages, tier } = req.body;
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).json({ error: "Messages array is required" });
+  }
 
   try {
-    let result;
-
-    // --- STRATEGY: FAST TIER ---
+    let content;
     if (tier === 'fast') {
-      try {
-        result = await callGroq(messages, "llama-3.1-8b-instant");
-      } catch (err) {
-        try {
-          result = await callHuggingFace(messages);
-        } catch (err2) {
-          throw new Error("All Fast Tier providers failed");
-        }
-      }
-    } 
-    // --- STRATEGY: POWERFUL TIER ---
-    else {
-      try {
-        result = await callGroq(messages, "llama-3.3-70b-versatile");
-      } catch (err) {
-        try {
-          result = await callOpenRouter(messages);
-        } catch (err2) {
-          try {
-            result = await callGoogle(messages);
-          } catch (err3) {
-            throw new Error("All Powerful Tier providers failed");
-          }
-        }
-      }
+      content = await withFallback([
+        () => callGroq(messages, "llama-3.1-8b-instant"),
+        () => callHuggingFace(messages)
+      ]);
+    } else {
+      content = await withFallback([
+        () => callGroq(messages, "llama-3.3-70b-versatile"),
+        () => callOpenRouter(messages),
+        () => callGoogle(messages)
+      ]);
     }
 
-    res.status(200).json({ content: result });
-
+    res.status(200).json({ content });
   } catch (error) {
     console.error("Vercel Function Error:", error);
-    res.status(500).json({ error: "AI Service Unavailable. Please try again." });
+    res.status(500).json({ error: error.message || "AI Service Unavailable" });
   }
 }

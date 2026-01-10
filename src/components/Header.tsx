@@ -29,13 +29,9 @@ export function Header() {
       <div className="flex items-center gap-4 md:gap-8 text-sm font-medium tracking-wide">
         {user ? (
           <>
-            <Link to="/my-courses" className={`text-foreground/70 hover:text-primary transition-colors ${location.pathname === '/my-courses' ? 'text-primary' : ''}`}>
-              DASHBOARD
-            </Link>
-            
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="p-0 h-auto hover:bg-transparent text-foreground/70 hover:text-primary">
+                <Button variant="ghost" className="p-0 h-auto hover:bg-transparent text-foreground/70 hover:text-primary transition-colors">
                   <UserIcon className="w-5 h-5" />
                 </Button>
               </DropdownMenuTrigger>
@@ -66,14 +62,14 @@ export function Header() {
           </>
         ) : (
           <Link to="/login" className="text-foreground/70 hover:text-primary transition-colors">
-            LOGIN
+            PORTAL
           </Link>
         )}
 
         {/* CTA Button */}
         {location.pathname !== "/make-course" && (
           <Link to="/make-course">
-            <Button className="rounded-none bg-foreground text-background hover:bg-primary hover:text-white border-none font-bold tracking-tighter transition-all">
+            <Button className="rounded-full px-6 bg-foreground text-background hover:bg-primary hover:text-white border-none font-bold tracking-tighter transition-all">
               GENERATE
               <ArrowRight className="ml-2 w-4 h-4" />
             </Button>

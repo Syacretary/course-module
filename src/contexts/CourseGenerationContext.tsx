@@ -75,10 +75,17 @@ export function CourseGenerationProvider({ children }: { children: React.ReactNo
     }
   }, [user?.id]);
 
-  // Save state to localStorage on change
+  // Save state to localStorage on change (optimized)
   useEffect(() => {
     const key = getDraftKey(user?.id);
-    localStorage.setItem(key, JSON.stringify(state));
+    
+    // Only save essential draft info, not the whole course or progress
+    const { course, generationProgress, ...essentialState } = state;
+    
+    // Don't save if we are in 'complete' step as it's already in Firestore
+    if (state.step === 'complete') return;
+    
+    localStorage.setItem(key, JSON.stringify(essentialState));
   }, [state, user?.id]);
 
   const toggleTopic = useCallback((topicId: string) => {
